@@ -114,11 +114,12 @@ Hit hitMesh(const Ray &ray, const Mesh &mesh, const Scene &scene, int obj_id){
             hit.intersection_point = findIntersectionPoint(ray, t);
             hit.material_id = mesh.material_id;
             hit.normal = normal;
-            hit.object_id = obj_id;
-            hit.type = 2;
+
             hit.t = t;
         }
     }
+    hit.object_id = obj_id;
+    hit.type = 2;
 
     return hit;
 }
@@ -137,12 +138,12 @@ const Vec3f diffuseShading(const PointLight &current_light, const Scene &scene, 
 	Vec3f w_i = subtract(current_light.position, hit.intersection_point);
 	w_i = normalize(w_i);
 
-	float dotPro = dot(w_i, hit.normal);
-    dotPro = (dotPro < 0) ? 0 : dotPro;
+	float cos_theta_prime = dot(w_i, hit.normal);
+    cos_theta_prime = (cos_theta_prime < 0) ? 0 : cos_theta_prime;
 
-	color.x = scene.materials[hit.material_id - 1].diffuse.x * dotPro * irradiance.x;
-	color.y = scene.materials[hit.material_id - 1].diffuse.y * dotPro * irradiance.y;
-	color.z = scene.materials[hit.material_id - 1].diffuse.z * dotPro * irradiance.z;
+	color.x = scene.materials[hit.material_id - 1].diffuse.x * cos_theta_prime * irradiance.x;
+	color.y = scene.materials[hit.material_id - 1].diffuse.y * cos_theta_prime * irradiance.y;
+	color.z = scene.materials[hit.material_id - 1].diffuse.z * cos_theta_prime * irradiance.z;
 	
 	return color;
 }
@@ -266,6 +267,7 @@ bool shadow(Ray shadow_ray, Scene scene, float t){
 
         if(shadow_hit.hit_happened && t > shadow_hit.t && shadow_hit.t >= 0) return true;
     }
+    return false;
 }
 
 Vec3f computeColor(const Scene &scene, Hit &hit, const Camera &camera, Ray &ray, int recursion_count){
@@ -354,27 +356,43 @@ Vec3f computeColor(const Scene &scene, Hit &hit, const Camera &camera, Ray &ray,
     return color;
 }
 
-// void multiThread(Scene scene, int camera_no, unsigned char* &image, int height, int width){
-//     for(int i = 0; i < height; i++){
-//         for(int j = 0; j < width; j++){
-//             Ray ray = generateRay(scene.cameras[camera_no], j, i);
-//             Vec3f color;
+void multiThreadLoop(Scene scene, int camera_no, unsigned char* &image, int height, int width, int i){
+    for(; i < height; i++){
+        for(int j = 0; j < width; j++){
+            Ray ray = generateRay(scene.cameras[camera_no], j, i);
+            Vec3f color;
 
-//             Hit hit = findHit(scene, ray);
-//             color = computeColor(scene, hit, scene.cameras[camera_no],ray, scene.max_recursion_depth);
+            Hit hit = findHit(scene, ray);
+            color = computeColor(scene, hit, scene.cameras[camera_no],ray, scene.max_recursion_depth);
 
-//             // if the color values greater than 255 we set 255 otherwise round the nearest integer value
-//             if(color.x > 255) image[3* i * width + 3 * j] = 255;
-//             else image[3* i * width + 3 * j] = (int) (color.x + 0.5);
+            // if the color values greater than 255 we set 255 otherwise round the nearest integer value
+            if(color.x > 255) image[3* i * width + 3 * j] = 255;
+            else image[3* i * width + 3 * j] = (int) (color.x + 0.5);
 
-//             if(color.y > 255) image[3 * i * width + 3 * j + 1] = 255;
-//             else image[3* i * width + 3 * j + 1] = (int) (color.y + 0.5);
+            if(color.y > 255) image[3 * i * width + 3 * j + 1] = 255;
+            else image[3* i * width + 3 * j + 1] = (int) (color.y + 0.5);
 
-//             if(color.z > 255) image[3 * i * width + 3 * j + 2] = 255;
-//             else image[3 * i * width + 3 * j + 2] = (int) (color.z + 0.5);
-//         }
-//     }
-// }
+            if(color.z > 255) image[3 * i * width + 3 * j + 2] = 255;
+            else image[3 * i * width + 3 * j + 2] = (int) (color.z + 0.5);
+        }
+    }
+}
+
+
+void multiThread(Scene scene, int camera_no, unsigned char* &image, int height, int width){
+    thread t1(multiThreadLoop, scene, camera_no, ref(image), height / 4, width, 0);
+    thread t2(multiThreadLoop, scene, camera_no, ref(image), height / 2, width, height / 4);
+    thread t3(multiThreadLoop, scene, camera_no, ref(image), 3 * height / 4, width, height / 2);
+    thread t4(multiThreadLoop, scene, camera_no, ref(image), height, width, 3 * height / 4);
+
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+
+}
+
+
 
 int main(int argc, char* argv[]){
     parser::Scene scene;
@@ -388,28 +406,30 @@ int main(int argc, char* argv[]){
         int height = scene.cameras[camera_no].image_height;
         unsigned char* image = new unsigned char [width * height * 3];
 
-        //thread(multiThread, scene, camera_no, image, height, width);
+        thread threading(multiThread, scene, camera_no, ref(image), height, width);
+        
+        threading.join();
 
-        for(int i = 0; i < height; i++){
-            for(int j = 0; j < width; j++){
-                Ray ray = generateRay(scene.cameras[camera_no], j, i);
-                Vec3f color;
+        // for(int i = 0; i < height; i++){
+        //     for(int j = 0; j < width; j++){
+        //         Ray ray = generateRay(scene.cameras[camera_no], j, i);
+        //         Vec3f color;
 
-                Hit hit = findHit(scene, ray);
-                color = computeColor(scene, hit, scene.cameras[camera_no],ray, scene.max_recursion_depth);
+        //         Hit hit = findHit(scene, ray);
+        //         color = computeColor(scene, hit, scene.cameras[camera_no],ray, scene.max_recursion_depth);
 
-                // if the color values greater than 255 we set 255 otherwise round the nearest integer value
-                if(color.x > 255) image[3* i * width + 3 * j] = 255;
-                else image[3* i * width + 3 * j] = (int) (color.x + 0.5);
+        //         //if the color values greater than 255 we set 255 otherwise round the nearest integer value
+        //         if(color.x > 255) image[3* i * width + 3 * j] = 255;
+        //         else image[3* i * width + 3 * j] = (int) (color.x + 0.5);
 
-                if(color.y > 255) image[3 * i * width + 3 * j + 1] = 255;
-                else image[3* i * width + 3 * j + 1] = (int) (color.y + 0.5);
+        //         if(color.y > 255) image[3 * i * width + 3 * j + 1] = 255;
+        //         else image[3* i * width + 3 * j + 1] = (int) (color.y + 0.5);
 
-                if(color.z > 255) image[3 * i * width + 3 * j + 2] = 255;
-                else image[3 * i * width + 3 * j + 2] = (int) (color.z + 0.5);
+        //         if(color.z > 255) image[3 * i * width + 3 * j + 2] = 255;
+        //         else image[3 * i * width + 3 * j + 2] = (int) (color.z + 0.5);
                 
-            }
-        }
+        //     }
+        // }
         
         write_ppm(scene.cameras[camera_no].image_name.c_str(), image, width, height);
 

@@ -1,0 +1,5 @@
+g++ *.cpp -o raytracer -std=c++11 -pthread
+Starts ../inputs/berserker.xml
+../inputs/berserker.xml
+553
+Starts ../inputs/bunny.xml
