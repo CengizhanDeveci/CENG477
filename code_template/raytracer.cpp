@@ -354,6 +354,28 @@ Vec3f computeColor(const Scene &scene, Hit &hit, const Camera &camera, Ray &ray,
     return color;
 }
 
+// void multiThread(Scene scene, int camera_no, unsigned char* &image, int height, int width){
+//     for(int i = 0; i < height; i++){
+//         for(int j = 0; j < width; j++){
+//             Ray ray = generateRay(scene.cameras[camera_no], j, i);
+//             Vec3f color;
+
+//             Hit hit = findHit(scene, ray);
+//             color = computeColor(scene, hit, scene.cameras[camera_no],ray, scene.max_recursion_depth);
+
+//             // if the color values greater than 255 we set 255 otherwise round the nearest integer value
+//             if(color.x > 255) image[3* i * width + 3 * j] = 255;
+//             else image[3* i * width + 3 * j] = (int) (color.x + 0.5);
+
+//             if(color.y > 255) image[3 * i * width + 3 * j + 1] = 255;
+//             else image[3* i * width + 3 * j + 1] = (int) (color.y + 0.5);
+
+//             if(color.z > 255) image[3 * i * width + 3 * j + 2] = 255;
+//             else image[3 * i * width + 3 * j + 2] = (int) (color.z + 0.5);
+//         }
+//     }
+// }
+
 int main(int argc, char* argv[]){
     parser::Scene scene;
 
@@ -365,6 +387,8 @@ int main(int argc, char* argv[]){
         int width = scene.cameras[camera_no].image_width;
         int height = scene.cameras[camera_no].image_height;
         unsigned char* image = new unsigned char [width * height * 3];
+
+        //thread(multiThread, scene, camera_no, image, height, width);
 
         for(int i = 0; i < height; i++){
             for(int j = 0; j < width; j++){
