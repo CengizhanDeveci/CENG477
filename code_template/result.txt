@@ -1,5 +1,17 @@
 g++ *.cpp -o raytracer -std=c++11 -pthread
 Starts ../inputs/berserker.xml
 ../inputs/berserker.xml
-553
+267
 Starts ../inputs/bunny.xml
+../inputs/bunny.xml
+114
+Starts ../inputs/car.xml
+../inputs/car.xml
+3548
+Starts ../inputs/cornellbox.xml
+../inputs/cornellbox.xml
+9
+Starts ../inputs/dragon_lowres.xml
+../inputs/dragon_lowres.xml
+1235
+Starts ../inputs/horse_and_mug.xml

@@ -114,8 +114,8 @@ Hit hitMesh(const Ray &ray, const Mesh &mesh, const Scene &scene, int obj_id){
             hit.intersection_point = findIntersectionPoint(ray, t);
             hit.material_id = mesh.material_id;
             hit.normal = normal;
-
             hit.t = t;
+            t_min = t;
         }
     }
     hit.object_id = obj_id;
@@ -139,7 +139,7 @@ const Vec3f diffuseShading(const PointLight &current_light, const Scene &scene, 
 	w_i = normalize(w_i);
 
 	float cos_theta_prime = dot(w_i, hit.normal);
-    cos_theta_prime = (cos_theta_prime < 0) ? 0 : cos_theta_prime;
+    if(cos_theta_prime < 0) cos_theta_prime = 0;
 
 	color.x = scene.materials[hit.material_id - 1].diffuse.x * cos_theta_prime * irradiance.x;
 	color.y = scene.materials[hit.material_id - 1].diffuse.y * cos_theta_prime * irradiance.y;
@@ -159,7 +159,7 @@ Vec3f specularShading(const PointLight &current_light, const Scene &scene, const
 	h = normalize(h);
 
 	float cos_alpha_prime = dot(hit.normal, h);
-	cos_alpha_prime = (cos_alpha_prime < 0) ? 0 : cos_alpha_prime;
+	if(cos_alpha_prime < 0) cos_alpha_prime = 0;
 
 	color.x = scene.materials[hit.material_id - 1].specular.x * pow(cos_alpha_prime, scene.materials[hit.material_id - 1].phong_exponent) * irradiance.x;
 	color.y = scene.materials[hit.material_id - 1].specular.y * pow(cos_alpha_prime, scene.materials[hit.material_id - 1].phong_exponent) * irradiance.y;
@@ -181,7 +181,7 @@ Hit findHit(const Scene &scene, const Ray &ray){
 
         Hit hit = hitSphere(ray, center, radius, current_sphere.material_id, sphere_number);
 
-        if(hit.hit_happened && hit.t >= 0)
+        if(hit.hit_happened && hit.t > 0)
         {
             if(hit.t < hitted.t){
                 hitted.hit_happened = true;
@@ -197,12 +197,9 @@ Hit findHit(const Scene &scene, const Ray &ray){
     // loop for triangle hit
     for(int triangle_number = 0; triangle_number < scene.triangles.size(); triangle_number++){
         Triangle current_triangle = scene.triangles[triangle_number];
-        Vec3f v0 = scene.vertex_data[current_triangle.indices.v0_id - 1];
-        Vec3f v1 = scene.vertex_data[current_triangle.indices.v1_id - 1];
-        Vec3f v2 = scene.vertex_data[current_triangle.indices.v2_id - 1];
 
         Hit hit = hitTriangle(ray, scene, current_triangle, triangle_number);
-        if(hit.hit_happened && hit.t >= 0)
+        if(hit.hit_happened && hit.t > 0)
         {
             if(hit.t < hitted.t){
                 hitted.hit_happened = true;
@@ -219,7 +216,7 @@ Hit findHit(const Scene &scene, const Ray &ray){
     for(int mesh_number = 0; mesh_number < scene.meshes.size(); mesh_number++){
         Mesh current_mesh = scene.meshes[mesh_number];
         Hit hit = hitMesh(ray, current_mesh, scene, mesh_number);
-        if(hit.hit_happened && hit.t >= 0)
+        if(hit.hit_happened && hit.t > 0)
         {
             if(hit.t < hitted.t){
                 hitted.hit_happened = true;
@@ -244,19 +241,16 @@ bool shadow(Ray shadow_ray, Scene scene, float t){
         float radius = currentSphere.radius;
         Hit shadow_hit = hitSphere(shadow_ray, center, radius, currentSphere.material_id, sphereNumber);
 
-        if(shadow_hit.hit_happened && t > shadow_hit.t && shadow_hit.t >= 0) return true;
+        if(shadow_hit.hit_happened && t > shadow_hit.t && shadow_hit.t > 0) return true;
     }
 
     // loop for triangle hit
     for(int triangleNumber = 0; triangleNumber < scene.triangles.size(); triangleNumber++)
     {
         Triangle currentTriangle = scene.triangles[triangleNumber];
-        Vec3f v0 = scene.vertex_data[currentTriangle.indices.v0_id - 1];
-        Vec3f v1 = scene.vertex_data[currentTriangle.indices.v1_id - 1];
-        Vec3f v2 = scene.vertex_data[currentTriangle.indices.v2_id - 1];
         Hit shadow_hit = hitTriangle(shadow_ray, scene, currentTriangle, triangleNumber);
 
-        if(shadow_hit.hit_happened && t > shadow_hit.t && shadow_hit.t >= 0) return true;
+        if(shadow_hit.hit_happened && t > shadow_hit.t && shadow_hit.t > 0) return true;
     }
 
     // loop for mesh hit
@@ -265,7 +259,7 @@ bool shadow(Ray shadow_ray, Scene scene, float t){
         Mesh currentMesh = scene.meshes[meshNumber];
         Hit shadow_hit = hitMesh(shadow_ray, currentMesh, scene, meshNumber);
 
-        if(shadow_hit.hit_happened && t > shadow_hit.t && shadow_hit.t >= 0) return true;
+        if(shadow_hit.hit_happened && t > shadow_hit.t && shadow_hit.t > 0) return true;
     }
     return false;
 }
@@ -274,10 +268,7 @@ Vec3f computeColor(const Scene &scene, Hit &hit, const Camera &camera, Ray &ray,
     Vec3f color;
 
     if(hit.hit_happened){
-        int material_id = hit.material_id;
-
-        color = ambientShading(scene, material_id);
-
+        color = ambientShading(scene, hit.material_id);
 
         for(int light_number = 0; light_number < scene.point_lights.size(); light_number++){
             bool is_shadow = false;
