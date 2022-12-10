@@ -205,7 +205,7 @@ bool isVisible(double den, double num, double &tEnter, double &tLeave){
 
 // !!!!!!! xmin, xmax?? I use -1 and 1 look for that
 // I will use Liang-Barsky Algorithm for lines clipping
-void clipping(Vec3 point1, Vec3 point2){
+void clipping(Vec3& point1, Vec3& point2){
 	double dx = point2.x - point1.x;
 	double dy = point2.y - point1.y;
 	double dz = point2.z - point1.z;
@@ -231,7 +231,6 @@ void clipping(Vec3 point1, Vec3 point2){
 							}
 						}
 }
-
 
 
 // push all transformations matrixes
@@ -284,14 +283,52 @@ Matrix4 Scene::cameraTransformation(Camera* camera){
 	return result;
 }
 
-// transform the single mesh
-void Scene::meshTransform(Mesh* mesh, int meshNumber, vector<vector<Vec3>>& transformed){
 
+// for every mesh it will find the new vertex position according to transformations and camera matrix
+void Scene::transformVertices(Matrix4 cameraMatrix, int meshNumber){
+
+	for(int i = 0; i < this->vertices.size(); i++){
+		Matrix4 result = multiplyMatrixWithMatrix(cameraMatrix, transformationsResult[meshNumber - 1]);
+
+		Vec4 vertex;
+		vertex.x = this->vertices[i]->x;
+		vertex.y = this->vertices[i]->y;
+		vertex.z = this->vertices[i]->z;
+		vertex.t = 1;
+		vertex.colorId = this->vertices[i]->colorId;
+
+		vertex = multiplyMatrixWithVec4(result, vertex);
+
+		Vec3 resultVertex;
+		double w = vertex.t;
+		resultVertex.x = vertex.x / w;
+		resultVertex.y = vertex.y / w;
+		resultVertex.z = vertex.z / w;
+		resultVertex.colorId = vertex.colorId;
+
+		transformedVertices[meshNumber - 1].push_back(resultVertex);
+	}
 }
 
-// TODO
-bool backfaceCulling(Camera* camera){
-	
+
+Vec3 findNormal(Vec3 a, Vec3 b, Vec3 c){
+	Vec3 normal;
+
+	normal = crossProductVec3(subtractVec3(c, b), subtractVec3(a, b));
+	normalizeVec3(normal);
+
+	return normal;
+}
+
+
+bool Scene::backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber){
+	Vec3 a = this->transformedVertices[meshNumber][triangle.getFirstVertexId() - 1];
+	Vec3 b = this->transformedVertices[meshNumber][triangle.getSecondVertexId() - 1];
+	Vec3 c = this->transformedVertices[meshNumber][triangle.getThirdVertexId() - 1];
+	Vec3 n = findNormal(a, b, c);
+
+	double dot = dotProductVec3(inverseW, n);
+	return true ? dot > 0 : false;
 }
 
 void Scene::forwardRenderingPipeline(Camera *camera)
@@ -299,9 +336,10 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 	// TODO: Implement this function.
 	meshesTransformations();
 	Matrix4 cameraMatrix = cameraTransformation(camera);
-	vector<vector<Vec3>> transformed;
-	for(int i = 0; i < this->meshes.size(); i++){
-		meshTransform(meshes[], meshNumber);
+	
+	for(int meshNumber = 0; meshNumber < this->meshes.size(); meshNumber++){
+		transformedVertices.push_back(vector<Vec3>());
+		transformVertices(cameraMatrix, meshNumber);
 	}
 
 }

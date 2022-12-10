@@ -44,13 +44,16 @@ public:
 	void convertPPMToPNG(string ppmFileName, int osType);
 
 	vector<Matrix4> transformations();
-	void meshTransform(Mesh* mesh);
 	void meshesTransformations();
 
 	vector<Matrix4> translationsMatrix;
 	vector<Matrix4> scalingsMatrix;
 	vector<Matrix4> rotationsMatrix;
 	vector<Matrix4> transformationsResult; // each index equals the transformations matrix result for that mesh
+	Matrix4 cameraTransformation(Camera* camera);
+	vector<vector<Vec3>> transformedVertices;
+	void transformVertices(Matrix4 cameraMatrix, int meshNumber);
+	bool backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber);
 
 };
 
