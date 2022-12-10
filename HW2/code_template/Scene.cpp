@@ -24,9 +24,286 @@ using namespace std;
 	Transformations, clipping, culling, rasterization are done here.
 	You may define helper functions.
 */
+
+// it takes the amount of translation and returns translation matrix
+Matrix4 translation(Translation translation){
+	Matrix4 result;
+
+	result.val[0][0] = 1;
+	result.val[1][1] = 1;
+	result.val[2][2] = 1;
+	result.val[3][3] = 1;
+
+	result.val[0][3] = translation.tx;
+	result.val[1][3] = translation.ty;
+	result.val[2][3] = translation.tz;
+
+	return result;
+}
+
+// it takes an angle as an argument and return the rotation matrix
+Matrix4 rotation(Rotation rotation){
+	Matrix4 result;
+
+	// initializing u
+	Vec3 u;
+	u.x = rotation.ux;
+	u.y = rotation.uy;
+	u.z = rotation.uz;
+	normalizeVec3(u);
+
+	// finding v
+	// firstly we need to find smallest absolute value
+	double smallest = abs(u.x);
+	char smallestIndex = 'x';
+	if(smallest > abs(u.y)){
+		smallest = abs(u.y);
+		smallestIndex = 'y';
+	}
+	if(smallest > abs(u.z)){
+		smallest = abs(u.z);
+		smallestIndex = 'z';
+	}
+
+	
+	// swapping the other two by making one of them negating
+	Vec3 v;
+	if(smallestIndex == 'x'){
+		v.x = 0;
+		v.y = -u.z;
+		v.z = u.y;
+	}else if(smallestIndex == 'y'){
+		v.x = -u.z;
+		v.y = 0;
+		v.z = u.x;
+	}else{
+		v.x = -u.y;
+		v.y = u.x;
+		v.z = 0;
+	}
+
+	// finding the w by making cross product
+	Vec3 w;
+	w = crossProductVec3(u, v);
+	normalizeVec3(w);
+	normalizeVec3(v);
+	normalizeVec3(u);
+
+	Matrix4 matrixInverse;
+	matrixInverse.val[0][0] = u.x;
+	matrixInverse.val[1][0] = u.y;
+	matrixInverse.val[2][0] = u.z;
+	matrixInverse.val[1][0] = v.x;
+	matrixInverse.val[1][1] = v.y;
+	matrixInverse.val[1][2] = v.z;
+	matrixInverse.val[2][0] = w.x;
+	matrixInverse.val[2][1] = w.y;
+	matrixInverse.val[2][2] = w.z;
+	matrixInverse.val[3][3] = 1;
+
+	Matrix4 matrixM;
+	matrixM.val[0][0] = u.x;
+	matrixM.val[1][0] = v.x;
+	matrixM.val[2][0] = w.x;
+	matrixM.val[1][0] = u.y;
+	matrixM.val[1][1] = v.y;
+	matrixM.val[1][2] = w.y;
+	matrixM.val[2][0] = u.z;
+	matrixM.val[2][1] = v.z;
+	matrixM.val[2][2] = w.z;
+	matrixM.val[3][3] = 1;
+
+	// Matrix4 translationMatrix = translation(Translation(-1, center.x, center.y, center.z));
+
+	// Matrix4 inverseTranslationMatrix = translation(Translation(-1, -center.x, -center.y, -center.z));
+	
+	// converts to radian from degree
+	double radian = rotation.angle * 3.14 / 180;
+	double cosTheta = cos(radian);
+	double sinTheta = sin(radian);
+
+	// we will rotate from the axis x now
+	Matrix4 rotationMatrix;
+	rotationMatrix.val[0][0] = 1;
+	rotationMatrix.val[1][1] = cosTheta;
+	rotationMatrix.val[1][2] = -sinTheta;
+	rotationMatrix.val[2][1] = sinTheta;
+	rotationMatrix.val[2][2] = cosTheta;
+	rotationMatrix.val[3][3] = 1;
+	
+	result = multiplyMatrixWithMatrix(matrixInverse, multiplyMatrixWithMatrix(rotationMatrix,matrixM));
+
+	return result;
+}
+
+Matrix4 scaling(Scaling scale){
+	Matrix4 result;
+
+	result.val[0][0] = scale.sx;
+	result.val[1][1] = scale.sy;
+	result.val[2][2] = scale.sz;
+	result.val[3][3] = 1;
+
+	return result;
+}
+
+
+Matrix4 orthographicProjection(Camera* camera){
+	Matrix4 result;
+
+	result.val[0][0] = 2 / (camera->right - camera->left);
+	result.val[0][3] = -(camera->right + camera->left) / (camera->right - camera->left);
+	result.val[1][1] = 2 / (camera->top - camera->bottom);
+	result.val[1][3] = - (camera->top + camera->bottom) / (camera->top - camera->bottom);
+	result.val[2][2] = -2 / (camera->far - camera->near);
+	result.val[2][3] = -(camera->far + camera->near) / (camera->far - camera->near); 
+
+	return result;
+}
+
+Matrix4 pers_p2o(Camera* camera){
+	Matrix4 result;
+
+	result.val[0][0] = camera->near;
+	result.val[1][1] = camera->near;
+	result.val[2][2] = camera->near + camera->far;
+	result.val[2][3] = camera->near * camera->far;
+	result.val[3][2] = -1;
+
+	return result;
+}
+
+
+// finds the perspective projection matrix by multiplying orthogonal matrix by p2o matrix.
+Matrix4 perspectiveProjection(Camera* camera){
+	Matrix4 result;
+	
+	Matrix4 orthMatrix = orthographicProjection(camera);
+	Matrix4 p2oMatrix = pers_p2o(camera);
+
+	result = multiplyMatrixWithMatrix(orthMatrix, p2oMatrix);
+
+	return result;
+}
+
+// for clipping it will return whether it is visible
+bool isVisible(double den, double num, double &tEnter, double &tLeave){
+	double t;
+	if(den > 0){ // potentially entering
+		t = num / den;
+		if(t > tLeave) return false;
+		if(t > tEnter) tEnter = t;
+	}else if(den < 0){ // potentially leaving
+		t = num / den;
+		if(t < tEnter) return false;
+		if(t < tLeave) tLeave = t;
+	}else if(num > 0){ // line parallel to edge
+		return false;
+	}
+	return true;
+}
+
+// !!!!!!! xmin, xmax?? I use -1 and 1 look for that
+// I will use Liang-Barsky Algorithm for lines clipping
+void clipping(Vec3 point1, Vec3 point2){
+	double dx = point2.x - point1.x;
+	double dy = point2.y - point1.y;
+	double dz = point2.z - point1.z;
+	double tE = 0;
+	double tL = 1;
+	bool visible = false;
+	if(isVisible(dx, -1 - point1.x, tE, tL))
+		if(isVisible(-dx, point1.x - 1, tE, tL))
+			if(isVisible(dy, -1 - point1.y, tE, tL))
+				if(isVisible(-dy, point1.y - 1, tE, tL))
+					if(isVisible(dz, -1 - point1.z, tE, tL))
+						if(isVisible(-dz, point1.z - 1, tE, tL)){
+							visible = true;
+							if(tL < 1){ // if it is visible change accordingly
+								point2.x = point1.x + dx * tL;
+								point2.y = point1.y + dy * tL;
+								point2.z = point1.z + dz * tL;
+							}
+							if(tE > 0){
+								point1.x = point1.x + dx * tE;
+								point1.y = point1.y + dy * tE;
+								point1.z = point1.z + dz * tE;
+							}
+						}
+}
+
+
+
+// push all transformations matrixes
+vector<Matrix4> Scene::transformations(){
+
+	for(int i = 0; i < this->translations.size(); i++){
+		this->translationsMatrix.push_back(translation(*translations[i]));
+	}
+	
+	for(int i = 0; i < this->scalings.size(); i++){
+		this->scalingsMatrix.push_back(scaling(*scalings[i]));
+	}
+	
+	for(int i = 0; i < this->rotations.size(); i++){
+		this->rotationsMatrix.push_back(rotation(*rotations[i]));
+	}
+}
+
+ // loop for the transform all meshes
+void Scene::meshesTransformations(){
+
+	// calculate the all transformations given in scene
+	transformations();
+	
+	// for all meshes it finds the required transformations matrix
+	for(int i = 0; i < this->meshes.size(); i++){
+		Matrix4 result = getIdentityMatrix();
+		for(int j = 0; this->meshes[i]->numberOfTransformations; j++){
+			if(this->meshes[i]->transformationTypes[j] == 't'){
+				result = multiplyMatrixWithMatrix(result, this->translationsMatrix[this->meshes[i]->transformationIds[j] - 1]);
+			}else if(this->meshes[i]->transformationTypes[j] == 's'){
+				result = multiplyMatrixWithMatrix(result, this->scalingsMatrix[this->meshes[i]->transformationIds[j] - 1]);
+			}else if(this->meshes[i]->transformationTypes[j] == 'r'){
+				result = multiplyMatrixWithMatrix(result, this->rotationsMatrix[this->meshes[i]->transformationIds[j] - 1]);
+			}
+		}
+		this->transformationsResult.push_back(result);
+	}
+}
+
+
+// it will return the camera transformation matrix
+Matrix4 Scene::cameraTransformation(Camera* camera){
+	Matrix4 result;
+	if(camera->projectionType == 0){
+		result = orthographicProjection(camera);
+	}else if(camera->projectionType == 1){
+		result = perspectiveProjection(camera);
+	}
+	return result;
+}
+
+// transform the single mesh
+void Scene::meshTransform(Mesh* mesh, int meshNumber, vector<vector<Vec3>>& transformed){
+
+}
+
+// TODO
+bool backfaceCulling(Camera* camera){
+	
+}
+
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function.
+	meshesTransformations();
+	Matrix4 cameraMatrix = cameraTransformation(camera);
+	vector<vector<Vec3>> transformed;
+	for(int i = 0; i < this->meshes.size(); i++){
+		meshTransform(meshes[], meshNumber);
+	}
+
 }
 
 /*
