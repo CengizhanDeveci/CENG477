@@ -370,6 +370,80 @@ bool Scene::backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber){
 	return true ? dot > 0 : false;
 }
 
+void Scene::draw(int x, int y, Color c) {
+	this->image[x][y] = c;
+}
+
+void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, Color c1){
+	int y = y0;
+	int d = (y0 - y1) + 0.5 * (x1 - x0);
+	Color c = c0;
+	double r, g, b;
+	r = (c1.r - c0.r) / (x1 - x0);
+	g = (c1.g - c0.g) / (x1 - x0);
+	b = (c1.b - c0.b) / (x1 - x0);
+	Color dc(r, g, b);
+	for(int x = 0; x <= x1; x++){
+		c.r = round(c.r);
+		c.g = round(c.g);
+		c.b = round(c.b);
+		draw(x, y, c);
+
+		if(d < 0){
+			y += 1;
+			d += ((y0 - y1) + (x1 - x0));
+		} else {
+			d += (y0 - y1);
+		}
+		c.r += dc.r;
+		c.g += dc.g;
+		c.b += dc.b;
+	}
+}
+
+float Scene::f01(int x, int y, int x0, int y0, int x1, int y1) {
+	return x * (y0 - y1) + y * (x1 - x0) + x0 * y1 - y0 * x1;
+}
+
+float Scene::f12(int x, int y, int x1, int y1, int x2, int y2) {
+	return x * (y1 - y2) + y * (x2 - x1) + x1 * y2 - y1 * x2;
+}
+
+float Scene::f20(int x, int y, int x2, int y2, int x0, int y0) {
+	return x * (y2 - y0) + y * (x0 - x2) + x2 * y0 - y2 * x0;
+}
+
+void Scene::triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2, Color c0, Color c1, Color c2) {
+	float alpha, beta, gamma;
+	int ymin, xmin, ymax, xmax;
+	Color c;
+	ymin = min(min(y0, y1), y2);
+	xmin = min(min(x0, x1), x2);
+	ymax = max(max(y0, y1), y2);
+	xmax = max(max(x0, x1), x2);
+	for (int y = ymin; y <= ymax; y++)
+	{
+		for (int x = xmin; x <= xmax; x++)
+		{
+			alpha = f12(x, y, x1, y1, x2, y2) / f12(x0, y0, x1, y1, x2, y2);
+			beta = f20(x, y, x2, y2, x0, y0) / f20(x1, y1, x2, y2, x0, y0);
+			gamma = f01(x, y, x0, y0, x1, y1) / f01(x2, y2, x0, y0, x1, y1);
+
+			if (alpha >= 0 && beta >= 0 && gamma >= 0)
+			{
+				c.r = alpha * c0.r + beta * c1.r + gamma * c2.r;
+				c.g = alpha * c0.g + beta * c1.g + gamma * c2.g;
+				c.b = alpha * c0.b + beta * c1.b + gamma * c2.b;
+				
+				c.r = round(c.r);
+				c.g = round(c.g);
+				c.b = round(c.b);
+				draw(x, y, c);
+			}
+		}
+	}
+}
+
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function.
