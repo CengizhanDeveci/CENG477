@@ -17,6 +17,7 @@
 #include "Triangle.h"
 #include "Vec3.h"
 #include "Vec4.h"
+#include "Matrix4.h"
 
 using namespace std;
 
@@ -43,7 +44,7 @@ public:
 	void writeImageToPPMFile(Camera* camera);
 	void convertPPMToPNG(string ppmFileName, int osType);
 
-	vector<Matrix4> transformations();
+	void transformations();
 	void meshesTransformations();
 
 	vector<Matrix4> translationsMatrix;

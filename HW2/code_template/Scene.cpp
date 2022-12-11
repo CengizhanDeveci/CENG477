@@ -26,7 +26,7 @@ using namespace std;
 */
 
 // it takes the amount of translation and returns translation matrix
-Matrix4 translation(Translation translation){
+Matrix4 translation(Translation t){
 	Matrix4 result;
 
 	result.val[0][0] = 1;
@@ -34,22 +34,22 @@ Matrix4 translation(Translation translation){
 	result.val[2][2] = 1;
 	result.val[3][3] = 1;
 
-	result.val[0][3] = translation.tx;
-	result.val[1][3] = translation.ty;
-	result.val[2][3] = translation.tz;
+	result.val[0][3] = t.tx;
+	result.val[1][3] = t.ty;
+	result.val[2][3] = t.tz;
 
 	return result;
 }
 
 // it takes an angle as an argument and return the rotation matrix
-Matrix4 rotation(Rotation rotation){
+Matrix4 rotation(Rotation r){
 	Matrix4 result;
 
 	// initializing u
 	Vec3 u;
-	u.x = rotation.ux;
-	u.y = rotation.uy;
-	u.z = rotation.uz;
+	u.x = r.ux;
+	u.y = r.uy;
+	u.z = r.uz;
 	normalizeVec3(u);
 
 	// finding v
@@ -118,7 +118,7 @@ Matrix4 rotation(Rotation rotation){
 	// Matrix4 inverseTranslationMatrix = translation(Translation(-1, -center.x, -center.y, -center.z));
 	
 	// converts to radian from degree
-	double radian = rotation.angle * 3.14 / 180;
+	double radian = r.angle * 3.14 / 180;
 	double cosTheta = cos(radian);
 	double sinTheta = sin(radian);
 
@@ -148,6 +148,25 @@ Matrix4 scaling(Scaling scale){
 }
 
 
+Matrix4 cameraTransform(Vec3 center, Vec3 u, Vec3 v, Vec3 w){
+	Matrix4 result;
+
+	result.val[0][0] = u.x;
+	result.val[0][1] = u.y;
+	result.val[0][2] = u.z;
+	result.val[1][0] = v.x;
+	result.val[1][1] = v.y;
+	result.val[1][2] = v.z;
+	result.val[2][0] = w.x;
+	result.val[2][1] = w.y;
+	result.val[2][2] = w.z;
+	result.val[3][3] = 1;
+
+	result = multiplyMatrixWithMatrix(result, translation(Translation(-1, -center.x, -center.y, -center.z)));
+
+	return result;
+}
+
 Matrix4 orthographicProjection(Camera* camera){
 	Matrix4 result;
 
@@ -157,6 +176,7 @@ Matrix4 orthographicProjection(Camera* camera){
 	result.val[1][3] = - (camera->top + camera->bottom) / (camera->top - camera->bottom);
 	result.val[2][2] = -2 / (camera->far - camera->near);
 	result.val[2][3] = -(camera->far + camera->near) / (camera->far - camera->near); 
+	result.val[3][3] = 1;
 
 	return result;
 }
@@ -186,6 +206,20 @@ Matrix4 perspectiveProjection(Camera* camera){
 	return result;
 }
 
+Matrix4 viewPortTransformation(double nx, double ny){
+	Matrix4 result;
+
+	result.val[0][0] = nx / 2;
+	result.val[0][3] = (nx - 1) / 2;
+	result.val[1][1] = ny / 2;
+	result.val[1][3] = (ny - 1) / 2;
+	result.val[2][2] = 0.5;
+	result.val[2][3] = 0.5;
+	result.val[3][3] = 1.0;
+
+	return result;
+}
+
 // for clipping it will return whether it is visible
 bool isVisible(double den, double num, double &tEnter, double &tLeave){
 	double t;
@@ -203,7 +237,7 @@ bool isVisible(double den, double num, double &tEnter, double &tLeave){
 	return true;
 }
 
-// !!!!!!! xmin, xmax?? I use -1 and 1 look for that
+
 // I will use Liang-Barsky Algorithm for lines clipping
 void clipping(Vec3& point1, Vec3& point2){
 	double dx = point2.x - point1.x;
@@ -234,7 +268,7 @@ void clipping(Vec3& point1, Vec3& point2){
 
 
 // push all transformations matrixes
-vector<Matrix4> Scene::transformations(){
+void Scene::transformations(){
 
 	for(int i = 0; i < this->translations.size(); i++){
 		this->translationsMatrix.push_back(translation(*translations[i]));
@@ -254,11 +288,10 @@ void Scene::meshesTransformations(){
 
 	// calculate the all transformations given in scene
 	transformations();
-	
 	// for all meshes it finds the required transformations matrix
 	for(int i = 0; i < this->meshes.size(); i++){
 		Matrix4 result = getIdentityMatrix();
-		for(int j = 0; this->meshes[i]->numberOfTransformations; j++){
+		for(int j = 0; j < this->meshes[i]->numberOfTransformations; j++){
 			if(this->meshes[i]->transformationTypes[j] == 't'){
 				result = multiplyMatrixWithMatrix(result, this->translationsMatrix[this->meshes[i]->transformationIds[j] - 1]);
 			}else if(this->meshes[i]->transformationTypes[j] == 's'){
@@ -280,6 +313,9 @@ Matrix4 Scene::cameraTransformation(Camera* camera){
 	}else if(camera->projectionType == 1){
 		result = perspectiveProjection(camera);
 	}
+
+	result = multiplyMatrixWithMatrix(result, cameraTransform(camera->pos, camera->u, camera->v, camera->w));
+
 	return result;
 }
 
@@ -301,12 +337,15 @@ void Scene::transformVertices(Matrix4 cameraMatrix, int meshNumber){
 
 		Vec3 resultVertex;
 		double w = vertex.t;
+
 		resultVertex.x = vertex.x / w;
 		resultVertex.y = vertex.y / w;
 		resultVertex.z = vertex.z / w;
 		resultVertex.colorId = vertex.colorId;
 
-		transformedVertices[meshNumber - 1].push_back(resultVertex);
+		printVec3(resultVertex);
+
+		transformedVertices[meshNumber].push_back(resultVertex);
 	}
 }
 
@@ -335,10 +374,15 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function.
 	meshesTransformations();
+	Matrix4 viewPortMatrix = viewPortTransformation(camera->horRes, camera->verRes);
+
 	Matrix4 cameraMatrix = cameraTransformation(camera);
-	
+	cameraMatrix = multiplyMatrixWithMatrix(viewPortMatrix, cameraMatrix);
+
 	for(int meshNumber = 0; meshNumber < this->meshes.size(); meshNumber++){
-		transformedVertices.push_back(vector<Vec3>());
+
+		vector<Vec3> tmp;
+		transformedVertices.push_back(tmp);
 		transformVertices(cameraMatrix, meshNumber);
 	}
 
