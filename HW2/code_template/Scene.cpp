@@ -375,29 +375,120 @@ void Scene::draw(int x, int y, Color c) {
 }
 
 void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, Color c1){
-	int y = y0;
-	int d = (y0 - y1) + 0.5 * (x1 - x0);
-	Color c = c0;
-	double r, g, b;
-	r = (c1.r - c0.r) / (x1 - x0);
-	g = (c1.g - c0.g) / (x1 - x0);
-	b = (c1.b - c0.b) / (x1 - x0);
-	Color dc(r, g, b);
-	for(int x = 0; x <= x1; x++){
-		c.r = round(c.r);
-		c.g = round(c.g);
-		c.b = round(c.b);
-		draw(x, y, c);
+	
+	double m = (double)(y1 - y0) / ((double)(x1 - x0));
 
-		if(d < 0){
-			y += 1;
-			d += ((y0 - y1) + (x1 - x0));
-		} else {
-			d += (y0 - y1);
+	if(m > 1.0){
+		int x = x0;
+		int d = 2 * (x0 - x1) + (y1 - y0);
+
+		Color c = c0;
+		double r, g, b;
+		r = (c1.r - c0.r) / (y1 - y0);
+		g = (c1.g - c0.g) / (y1 - y0);
+		b = (c1.b - c0.b) / (y1 - y0);
+		Color dc(r, g, b);
+
+		for(int y = y0; y <= y1; y++){
+			c.r = round(c.r);
+			c.g = round(c.g);
+			c.b = round(c.b);
+			draw(x, y, c);
+
+			if(d < 0){
+				x += 1;
+				d += 2 * ((x0 - x1) + (y1 - y0));
+			}else {
+				d += 2 * (x0 - x1);
+			}
+			c.r += dc.r;
+			c.g += dc.g;
+			c.b += dc.b;
+
 		}
-		c.r += dc.r;
-		c.g += dc.g;
-		c.b += dc.b;
+
+	}else if(m <= 1.0 && m > 0.0){
+		int y = y0;
+		int d = 2 * (y0 - y1) + (x1 - x0);
+
+		Color c = c0;
+		double r, g, b; // color change ratio for r g b
+		r = (c1.r - c0.r) / (x1 - x0);
+		g = (c1.g - c0.g) / (x1 - x0);
+		b = (c1.b - c0.b) / (x1 - x0);
+		Color dc(r, g, b);
+
+		for(int x = x0; x <= x1; x++){
+			c.r = round(c.r);
+			c.g = round(c.g);
+			c.b = round(c.b);
+			draw(x, y, c);
+
+			if(d < 0){
+				y += 1;
+				d += 2 * ((y0 - y1) + (x1 - x0));
+			} else {
+				d += 2 * (y0 - y1);
+			}
+			c.r += dc.r;
+			c.g += dc.g;
+			c.b += dc.b;
+		}
+	}else if(m <= 0.0 && m > -1.0){
+		int y = y1;
+		int d = 2 * (y1 - y0) + (x1 - x0);
+
+		Color c = c0;
+		double r, g, b; // color change ratio for r g b
+		r = (c1.r - c0.r) / (x1 - x0);
+		g = (c1.g - c0.g) / (x1 - x0);
+		b = (c1.b - c0.b) / (x1 - x0);
+		Color dc(r, g, b);
+
+		for(int x = x0; x <= x1; x++){
+			c.r = round(c.r);
+			c.g = round(c.g);
+			c.b = round(c.b);
+			draw(x, y, c);
+
+			if(d < 0){
+				y -= 1;
+				d += 2 * ((y1 - y0) + (x1 - x0));
+			} else {
+				d += 2 * (y1 - y0);
+			}
+			c.r += dc.r;
+			c.g += dc.g;
+			c.b += dc.b;
+		}
+	}else if(m <= -1.0){
+		int x = x0;
+		int d = 2 * (x0 - x1) + (y0 - y1);
+
+		Color c = c0;
+		double r, g, b;
+		r = (c1.r - c0.r) / (y1 - y0);
+		g = (c1.g - c0.g) / (y1 - y0);
+		b = (c1.b - c0.b) / (y1 - y0);
+		Color dc(r, g, b);
+
+		for(int y = y0; y <= y1; y++){
+			c.r = round(c.r);
+			c.g = round(c.g);
+			c.b = round(c.b);
+			draw(x, y, c);
+
+			if(d < 0){
+				x -= 1;
+				d += 2 * ((x0 - x1) + (y0 - y1));
+			}else {
+				d += 2 * (x0 - x1);
+			}
+			c.r += dc.r;
+			c.g += dc.g;
+			c.b += dc.b;
+
+		}
 	}
 }
 
@@ -458,6 +549,8 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 		transformedVertices.push_back(tmp);
 	
 		transformVertices(cameraMatrix, viewPortMatrix, meshNumber);
+
+
 	}
 
 }
