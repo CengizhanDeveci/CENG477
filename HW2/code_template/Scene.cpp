@@ -91,25 +91,25 @@ Matrix4 rotation(Rotation r){
 
 	Matrix4 matrixInverse;
 	matrixInverse.val[0][0] = u.x;
+	matrixInverse.val[0][1] = v.x;
+	matrixInverse.val[0][2] = w.x;
 	matrixInverse.val[1][0] = u.y;
-	matrixInverse.val[2][0] = u.z;
-	matrixInverse.val[1][0] = v.x;
 	matrixInverse.val[1][1] = v.y;
-	matrixInverse.val[1][2] = v.z;
-	matrixInverse.val[2][0] = w.x;
-	matrixInverse.val[2][1] = w.y;
+	matrixInverse.val[1][2] = w.y;
+	matrixInverse.val[2][0] = u.z;
+	matrixInverse.val[2][1] = v.z;
 	matrixInverse.val[2][2] = w.z;
 	matrixInverse.val[3][3] = 1;
 
 	Matrix4 matrixM;
 	matrixM.val[0][0] = u.x;
+	matrixM.val[0][1] = u.y;
+	matrixM.val[0][2] = u.z;
 	matrixM.val[1][0] = v.x;
-	matrixM.val[2][0] = w.x;
-	matrixM.val[1][0] = u.y;
 	matrixM.val[1][1] = v.y;
-	matrixM.val[1][2] = w.y;
-	matrixM.val[2][0] = u.z;
-	matrixM.val[2][1] = v.z;
+	matrixM.val[1][2] = v.z;
+	matrixM.val[2][0] = w.x;
+	matrixM.val[2][1] = w.y;
 	matrixM.val[2][2] = w.z;
 	matrixM.val[3][3] = 1;
 
@@ -131,7 +131,7 @@ Matrix4 rotation(Rotation r){
 	rotationMatrix.val[2][2] = cosTheta;
 	rotationMatrix.val[3][3] = 1;
 	
-	result = multiplyMatrixWithMatrix(matrixInverse, multiplyMatrixWithMatrix(rotationMatrix,matrixM));
+	result = multiplyMatrixWithMatrix(matrixInverse, multiplyMatrixWithMatrix(rotationMatrix, matrixM));
 
 	return result;
 }
@@ -293,11 +293,11 @@ void Scene::meshesTransformations(){
 		Matrix4 result = getIdentityMatrix();
 		for(int j = 0; j < this->meshes[i]->numberOfTransformations; j++){
 			if(this->meshes[i]->transformationTypes[j] == 't'){
-				result = multiplyMatrixWithMatrix(result, this->translationsMatrix[this->meshes[i]->transformationIds[j] - 1]);
+				result = multiplyMatrixWithMatrix(this->translationsMatrix[this->meshes[i]->transformationIds[j] - 1], result);
 			}else if(this->meshes[i]->transformationTypes[j] == 's'){
-				result = multiplyMatrixWithMatrix(result, this->scalingsMatrix[this->meshes[i]->transformationIds[j] - 1]);
+				result = multiplyMatrixWithMatrix(this->scalingsMatrix[this->meshes[i]->transformationIds[j] - 1], result);
 			}else if(this->meshes[i]->transformationTypes[j] == 'r'){
-				result = multiplyMatrixWithMatrix(result, this->rotationsMatrix[this->meshes[i]->transformationIds[j] - 1]);
+				result = multiplyMatrixWithMatrix(this->rotationsMatrix[this->meshes[i]->transformationIds[j] - 1], result);
 			}
 		}
 		this->transformationsResult.push_back(result);
@@ -321,11 +321,11 @@ Matrix4 Scene::cameraTransformation(Camera* camera){
 
 
 // for every mesh it will find the new vertex position according to transformations and camera matrix
-void Scene::transformVertices(Matrix4 cameraMatrix, int meshNumber){
+void Scene::transformVertices(Matrix4 cameraMatrix, Matrix4 viewPortMatrix, int meshNumber){
+	Matrix4 result = multiplyMatrixWithMatrix(cameraMatrix, transformationsResult[meshNumber]);
 
 	for(int i = 0; i < this->vertices.size(); i++){
-		Matrix4 result = multiplyMatrixWithMatrix(cameraMatrix, transformationsResult[meshNumber - 1]);
-
+			
 		Vec4 vertex;
 		vertex.x = this->vertices[i]->x;
 		vertex.y = this->vertices[i]->y;
@@ -335,6 +335,8 @@ void Scene::transformVertices(Matrix4 cameraMatrix, int meshNumber){
 
 		vertex = multiplyMatrixWithVec4(result, vertex);
 
+		vertex = multiplyMatrixWithVec4(viewPortMatrix, vertex);
+
 		Vec3 resultVertex;
 		double w = vertex.t;
 
@@ -342,8 +344,6 @@ void Scene::transformVertices(Matrix4 cameraMatrix, int meshNumber){
 		resultVertex.y = vertex.y / w;
 		resultVertex.z = vertex.z / w;
 		resultVertex.colorId = vertex.colorId;
-
-		printVec3(resultVertex);
 
 		transformedVertices[meshNumber].push_back(resultVertex);
 	}
@@ -451,18 +451,18 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 	Matrix4 viewPortMatrix = viewPortTransformation(camera->horRes, camera->verRes);
 
 	Matrix4 cameraMatrix = cameraTransformation(camera);
-	cameraMatrix = multiplyMatrixWithMatrix(viewPortMatrix, cameraMatrix);
 
 	for(int meshNumber = 0; meshNumber < this->meshes.size(); meshNumber++){
 
 		vector<Vec3> tmp;
 		transformedVertices.push_back(tmp);
-		transformVertices(cameraMatrix, meshNumber);
+	
+		transformVertices(cameraMatrix, viewPortMatrix, meshNumber);
 	}
 
 }
 
-/*
+/*	
 	Parses XML file
 */
 Scene::Scene(const char *xmlPath)

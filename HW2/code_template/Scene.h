@@ -53,7 +53,7 @@ public:
 	vector<Matrix4> transformationsResult; // each index equals the transformations matrix result for that mesh
 	Matrix4 cameraTransformation(Camera* camera);
 	vector<vector<Vec3>> transformedVertices;
-	void transformVertices(Matrix4 cameraMatrix, int meshNumber);
+	void transformVertices(Matrix4 cameraMatrix, Matrix4 viewPortMatrix, int meshNumber);
 	bool backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber);
 
 	void midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, Color c1);
