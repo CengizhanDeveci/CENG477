@@ -519,7 +519,6 @@ void Scene::triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2
 			alpha = f12(x, y, x1, y1, x2, y2) / f12(x0, y0, x1, y1, x2, y2);
 			beta = f20(x, y, x2, y2, x0, y0) / f20(x1, y1, x2, y2, x0, y0);
 			gamma = f01(x, y, x0, y0, x1, y1) / f01(x2, y2, x0, y0, x1, y1);
-
 			if (alpha >= 0 && beta >= 0 && gamma >= 0)
 			{
 				c.r = alpha * c0.r + beta * c1.r + gamma * c2.r;
@@ -529,9 +528,62 @@ void Scene::triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2
 				c.r = round(c.r);
 				c.g = round(c.g);
 				c.b = round(c.b);
+				
 				draw(x, y, c);
 			}
 		}
+	}
+}
+
+void Scene::drawMeshes(Camera* camera){
+	for(int meshNumber = 0; meshNumber < this->meshes.size(); meshNumber++){
+		for(int i = 0; i < this->meshes[meshNumber]->numberOfTriangles; i++){
+			if(!cullingEnabled || (cullingEnabled && backfaceCulling(inverseVec3(camera->w), this->meshes[meshNumber]->triangles[i],meshNumber))){
+				if(this->meshes[meshNumber]->type == 0){ // wireframe
+					int id1 = this->meshes[meshNumber]->triangles[i].getFirstVertexId();
+					int id2 = this->meshes[meshNumber]->triangles[i].getSecondVertexId();
+					int id3 = this->meshes[meshNumber]->triangles[i].getThirdVertexId();
+					// for id1 and id2
+					midpointWithInterpolation(this->transformedVertices[meshNumber][id1-1].x,
+					this->transformedVertices[meshNumber][id1 - 1].y,
+					this->transformedVertices[meshNumber][id2 - 1].x,
+					this->transformedVertices[meshNumber][id2 - 1].y,
+					*this->colorsOfVertices[this->transformedVertices[meshNumber][id1 - 1].colorId - 1],
+					*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1]);
+
+					// for id1 and id3 
+					midpointWithInterpolation(this->transformedVertices[meshNumber][id1-1].x,
+					this->transformedVertices[meshNumber][id1 - 1].y,
+					this->transformedVertices[meshNumber][id3 - 1].x,
+					this->transformedVertices[meshNumber][id3 - 1].y,
+					*this->colorsOfVertices[this->transformedVertices[meshNumber][id1 - 1].colorId - 1],
+					*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
+
+					//for id2 and id3
+					midpointWithInterpolation(this->transformedVertices[meshNumber][id2-1].x,
+					this->transformedVertices[meshNumber][id2 - 1].y,
+					this->transformedVertices[meshNumber][id3 - 1].x,
+					this->transformedVertices[meshNumber][id3 - 1].y,
+					*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1],
+					*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
+
+				}else{ // solid
+					int id1 = this->meshes[meshNumber]->triangles[i].getFirstVertexId();
+					int id2 = this->meshes[meshNumber]->triangles[i].getSecondVertexId();
+					int id3 = this->meshes[meshNumber]->triangles[i].getThirdVertexId();
+					triangleRasterization(this->transformedVertices[meshNumber][id1-1].x, 
+					this->transformedVertices[meshNumber][id1 - 1].y,
+					this->transformedVertices[meshNumber][id2 - 1].x,
+					this->transformedVertices[meshNumber][id2 - 1].y,
+					this->transformedVertices[meshNumber][id3 - 1].x,
+					this->transformedVertices[meshNumber][id3 - 1].y,
+					*this->colorsOfVertices[this->transformedVertices[meshNumber][id1 - 1].colorId - 1],
+					*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1],
+					*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
+				}
+			}
+		}
+		
 	}
 }
 
@@ -550,9 +602,8 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 	
 		transformVertices(cameraMatrix, viewPortMatrix, meshNumber);
 
-
 	}
-
+	drawMeshes(camera);
 }
 
 /*	
