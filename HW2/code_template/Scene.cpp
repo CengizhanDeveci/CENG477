@@ -379,6 +379,14 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 	double m = (double)(y1 - y0) / ((double)(x1 - x0));
 
 	if(m > 1.0){
+		if(y0 < y1){
+			int tmp = x1;
+			x1 = x0;
+			x0 = x1;
+			tmp = y1;dsadsadsa
+			y1 = y0;
+			y0 = tmp;
+		}
 		int x = x0;
 		int d = 2 * (x0 - x1) + (y1 - y0);
 
@@ -408,6 +416,14 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 		}
 
 	}else if(m <= 1.0 && m > 0.0){
+		if(x0 > x1){
+			int tmp = x1;
+			x1 = x0;
+			x0 = x1;
+			tmp = y1;
+			y1 = y0;
+			y0 = tmp;
+		}
 		int y = y0;
 		int d = 2 * (y0 - y1) + (x1 - x0);
 
@@ -435,6 +451,14 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 			c.b += dc.b;
 		}
 	}else if(m <= 0.0 && m > -1.0){
+		if(x0 > x1){
+			int tmp = x1;
+			x1 = x0;
+			x0 = x1;
+			tmp = y1;
+			y1 = y0;
+			y0 = tmp;
+		}
 		int y = y1;
 		int d = 2 * (y1 - y0) + (x1 - x0);
 
@@ -462,6 +486,14 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 			c.b += dc.b;
 		}
 	}else if(m <= -1.0){
+		if(y0 < y1){
+			int tmp = x1;
+			x1 = x0;
+			x0 = x1;
+			tmp = y1;
+			y1 = y0;
+			y0 = tmp;
+		}
 		int x = x0;
 		int d = 2 * (x0 - x1) + (y0 - y1);
 
@@ -587,6 +619,12 @@ void Scene::drawMeshes(Camera* camera){
 	}
 }
 
+
+void Scene::clearTransformed(){
+	this->transformedVertices.clear();
+	this->transformationsResult.clear();
+}
+
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function.
@@ -604,6 +642,8 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 
 	}
 	drawMeshes(camera);
+
+	clearTransformed();
 }
 
 /*	
