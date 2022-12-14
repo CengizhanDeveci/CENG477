@@ -581,9 +581,9 @@ void Scene::triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2
 
 void Scene::drawMeshes(Camera* camera){
 	for(int meshNumber = 0; meshNumber < this->meshes.size(); meshNumber++){
-		for(int i = 0; i < this->meshes[meshNumber]->numberOfTriangles; i++){
-
-			if(this->meshes[meshNumber]->type == 0){ // wireframe
+		for(int i = this->meshes[meshNumber]->numberOfTriangles - 1; i >= 0; i--){
+			if(!cullingEnabled || (cullingEnabled && backfaceCulling(camera->w, this->meshes[meshNumber]->triangles[i],meshNumber))){
+				if(this->meshes[meshNumber]->type == 0){ // wireframe
 					int id1 = this->meshes[meshNumber]->triangles[i].getFirstVertexId();
 					int id2 = this->meshes[meshNumber]->triangles[i].getSecondVertexId();
 					int id3 = this->meshes[meshNumber]->triangles[i].getThirdVertexId();
@@ -610,10 +610,7 @@ void Scene::drawMeshes(Camera* camera){
 					this->transformedVertices[meshNumber][id3 - 1].y,
 					*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1],
 					*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
-
-				}
-			else if(!cullingEnabled || (cullingEnabled && backfaceCulling(inverseVec3(camera->w), this->meshes[meshNumber]->triangles[i],meshNumber))){
-				 // solid
+				} else{ // solid
 				int id1 = this->meshes[meshNumber]->triangles[i].getFirstVertexId();
 				int id2 = this->meshes[meshNumber]->triangles[i].getSecondVertexId();
 				int id3 = this->meshes[meshNumber]->triangles[i].getThirdVertexId();
@@ -627,6 +624,8 @@ void Scene::drawMeshes(Camera* camera){
 				*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1],
 				*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
 			}
+			}
+			
 		}
 	}
 }
