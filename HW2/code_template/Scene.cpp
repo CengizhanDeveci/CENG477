@@ -379,13 +379,16 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 	double m = (double)(y1 - y0) / ((double)(x1 - x0));
 
 	if(m > 1.0){
-		if(y0 < y1){
+		if(y0 > y1){
 			int tmp = x1;
 			x1 = x0;
-			x0 = x1;
-			tmp = y1;dsadsadsa
+			x0 = tmp;
+			tmp = y1;
 			y1 = y0;
 			y0 = tmp;
+			Color colorTmp = c1;
+			c1 = c0;
+			c0 = colorTmp;
 		}
 		int x = x0;
 		int d = 2 * (x0 - x1) + (y1 - y0);
@@ -398,9 +401,9 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 		Color dc(r, g, b);
 
 		for(int y = y0; y <= y1; y++){
-			c.r = round(c.r);
-			c.g = round(c.g);
-			c.b = round(c.b);
+			c.r = makeBetweenZeroAnd255(round(c.r));
+			c.g = makeBetweenZeroAnd255(round(c.g));
+			c.b = makeBetweenZeroAnd255(round(c.b));
 			draw(x, y, c);
 
 			if(d < 0){
@@ -419,10 +422,13 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 		if(x0 > x1){
 			int tmp = x1;
 			x1 = x0;
-			x0 = x1;
+			x0 = tmp;
 			tmp = y1;
 			y1 = y0;
 			y0 = tmp;
+			Color colorTmp = c1;
+			c1 = c0;
+			c0 = colorTmp;
 		}
 		int y = y0;
 		int d = 2 * (y0 - y1) + (x1 - x0);
@@ -435,9 +441,9 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 		Color dc(r, g, b);
 
 		for(int x = x0; x <= x1; x++){
-			c.r = round(c.r);
-			c.g = round(c.g);
-			c.b = round(c.b);
+			c.r = makeBetweenZeroAnd255(round(c.r));
+			c.g = makeBetweenZeroAnd255(round(c.g));
+			c.b = makeBetweenZeroAnd255(round(c.b));
 			draw(x, y, c);
 
 			if(d < 0){
@@ -454,12 +460,15 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 		if(x0 > x1){
 			int tmp = x1;
 			x1 = x0;
-			x0 = x1;
+			x0 = tmp;
 			tmp = y1;
 			y1 = y0;
 			y0 = tmp;
+			Color colorTmp = c1;
+			c1 = c0;
+			c0 = colorTmp;
 		}
-		int y = y1;
+		int y = y0;
 		int d = 2 * (y1 - y0) + (x1 - x0);
 
 		Color c = c0;
@@ -470,9 +479,9 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 		Color dc(r, g, b);
 
 		for(int x = x0; x <= x1; x++){
-			c.r = round(c.r);
-			c.g = round(c.g);
-			c.b = round(c.b);
+			c.r = makeBetweenZeroAnd255(round(c.r));
+			c.g = makeBetweenZeroAnd255(round(c.g));
+			c.b = makeBetweenZeroAnd255(round(c.b));
 			draw(x, y, c);
 
 			if(d < 0){
@@ -489,29 +498,32 @@ void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, 
 		if(y0 < y1){
 			int tmp = x1;
 			x1 = x0;
-			x0 = x1;
+			x0 = tmp;
 			tmp = y1;
 			y1 = y0;
 			y0 = tmp;
+			Color colorTmp = c1;
+			c1 = c0;
+			c0 = colorTmp;
 		}
 		int x = x0;
 		int d = 2 * (x0 - x1) + (y0 - y1);
 
 		Color c = c0;
 		double r, g, b;
-		r = (c1.r - c0.r) / (y1 - y0);
-		g = (c1.g - c0.g) / (y1 - y0);
-		b = (c1.b - c0.b) / (y1 - y0);
+		r = (c1.r - c0.r) / (y0 - y1);
+		g = (c1.g - c0.g) / (y0 - y1);
+		b = (c1.b - c0.b) / (y0 - y1);
 		Color dc(r, g, b);
 
-		for(int y = y0; y <= y1; y++){
-			c.r = round(c.r);
-			c.g = round(c.g);
-			c.b = round(c.b);
+		for(int y = y0; y >= y1; y--){
+			c.r = makeBetweenZeroAnd255(round(c.r));
+			c.g = makeBetweenZeroAnd255(round(c.g));
+			c.b = makeBetweenZeroAnd255(round(c.b));
 			draw(x, y, c);
 
 			if(d < 0){
-				x -= 1;
+				x += 1;
 				d += 2 * ((x0 - x1) + (y0 - y1));
 			}else {
 				d += 2 * (x0 - x1);
@@ -570,8 +582,8 @@ void Scene::triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2
 void Scene::drawMeshes(Camera* camera){
 	for(int meshNumber = 0; meshNumber < this->meshes.size(); meshNumber++){
 		for(int i = 0; i < this->meshes[meshNumber]->numberOfTriangles; i++){
-			if(!cullingEnabled || (cullingEnabled && backfaceCulling(inverseVec3(camera->w), this->meshes[meshNumber]->triangles[i],meshNumber))){
-				if(this->meshes[meshNumber]->type == 0){ // wireframe
+
+			if(this->meshes[meshNumber]->type == 0){ // wireframe
 					int id1 = this->meshes[meshNumber]->triangles[i].getFirstVertexId();
 					int id2 = this->meshes[meshNumber]->triangles[i].getSecondVertexId();
 					int id3 = this->meshes[meshNumber]->triangles[i].getThirdVertexId();
@@ -599,23 +611,23 @@ void Scene::drawMeshes(Camera* camera){
 					*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1],
 					*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
 
-				}else{ // solid
-					int id1 = this->meshes[meshNumber]->triangles[i].getFirstVertexId();
-					int id2 = this->meshes[meshNumber]->triangles[i].getSecondVertexId();
-					int id3 = this->meshes[meshNumber]->triangles[i].getThirdVertexId();
-					triangleRasterization(this->transformedVertices[meshNumber][id1-1].x, 
-					this->transformedVertices[meshNumber][id1 - 1].y,
-					this->transformedVertices[meshNumber][id2 - 1].x,
-					this->transformedVertices[meshNumber][id2 - 1].y,
-					this->transformedVertices[meshNumber][id3 - 1].x,
-					this->transformedVertices[meshNumber][id3 - 1].y,
-					*this->colorsOfVertices[this->transformedVertices[meshNumber][id1 - 1].colorId - 1],
-					*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1],
-					*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
 				}
+			else if(!cullingEnabled || (cullingEnabled && backfaceCulling(inverseVec3(camera->w), this->meshes[meshNumber]->triangles[i],meshNumber))){
+				 // solid
+				int id1 = this->meshes[meshNumber]->triangles[i].getFirstVertexId();
+				int id2 = this->meshes[meshNumber]->triangles[i].getSecondVertexId();
+				int id3 = this->meshes[meshNumber]->triangles[i].getThirdVertexId();
+				triangleRasterization(this->transformedVertices[meshNumber][id1-1].x, 
+				this->transformedVertices[meshNumber][id1 - 1].y,
+				this->transformedVertices[meshNumber][id2 - 1].x,
+				this->transformedVertices[meshNumber][id2 - 1].y,
+				this->transformedVertices[meshNumber][id3 - 1].x,
+				this->transformedVertices[meshNumber][id3 - 1].y,
+				*this->colorsOfVertices[this->transformedVertices[meshNumber][id1 - 1].colorId - 1],
+				*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1],
+				*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
 			}
 		}
-		
 	}
 }
 
