@@ -239,13 +239,16 @@ bool isVisible(double den, double num, double &tEnter, double &tLeave){
 
 
 // I will use Liang-Barsky Algorithm for lines clipping
-void clipping(Vec3& point1, Vec3& point2){
+vector<Vec3> clipping(Vec3& point1, Vec3& point2, bool& visible){
 	double dx = point2.x - point1.x;
 	double dy = point2.y - point1.y;
 	double dz = point2.z - point1.z;
 	double tE = 0;
 	double tL = 1;
-	bool visible = false;
+	visible = false;
+	vector<Vec3> result;
+	Vec3 p1 = point1;
+	Vec3 p2 = point2;
 	if(isVisible(dx, -1 - point1.x, tE, tL))
 		if(isVisible(-dx, point1.x - 1, tE, tL))
 			if(isVisible(dy, -1 - point1.y, tE, tL))
@@ -254,16 +257,19 @@ void clipping(Vec3& point1, Vec3& point2){
 						if(isVisible(-dz, point1.z - 1, tE, tL)){
 							visible = true;
 							if(tL < 1){ // if it is visible change accordingly
-								point2.x = point1.x + dx * tL;
-								point2.y = point1.y + dy * tL;
-								point2.z = point1.z + dz * tL;
+								p2.x = p1.x + dx * tL;
+								p2.y = p1.y + dy * tL;
+								p2.z = p1.z + dz * tL;
 							}
 							if(tE > 0){
-								point1.x = point1.x + dx * tE;
-								point1.y = point1.y + dy * tE;
-								point1.z = point1.z + dz * tE;
+								p1.x = p1.x + dx * tE;
+								p1.y = p1.y + dy * tE;
+								p1.z = p1.z + dz * tE;
 							}
 						}
+	result.push_back(p1);
+	result.push_back(p2);
+	return result;
 }
 
 
@@ -335,7 +341,7 @@ void Scene::transformVertices(Matrix4 cameraMatrix, Matrix4 viewPortMatrix, int 
 
 		vertex = multiplyMatrixWithVec4(result, vertex);
 
-		vertex = multiplyMatrixWithVec4(viewPortMatrix, vertex);
+		// vertex = multiplyMatrixWithVec4(viewPortMatrix, vertex);
 
 		Vec3 resultVertex;
 		double w = vertex.t;
@@ -367,14 +373,14 @@ bool Scene::backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber){
 	Vec3 n = findNormal(a, b, c);
 
 	double dot = dotProductVec3(inverseW, n);
-	return true ? dot > 0 : false;
+	return dot > 0;
 }
 
 void Scene::draw(int x, int y, Color c) {
 	this->image[x][y] = c;
 }
 
-void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, Color c1){
+void Scene::midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, Color c1, Camera* camera){
 	
 	double m = (double)(y1 - y0) / ((double)(x1 - x0));
 
@@ -548,7 +554,7 @@ float Scene::f20(int x, int y, int x2, int y2, int x0, int y0) {
 	return x * (y2 - y0) + y * (x0 - x2) + x2 * y0 - y2 * x0;
 }
 
-void Scene::triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2, Color c0, Color c1, Color c2) {
+void Scene::triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2, Color c0, Color c1, Color c2, Camera* camera) {
 	float alpha, beta, gamma;
 	int ymin, xmin, ymax, xmax;
 	Color c;
@@ -572,57 +578,108 @@ void Scene::triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2
 				c.r = round(c.r);
 				c.g = round(c.g);
 				c.b = round(c.b);
-				
-				draw(x, y, c);
+				if(x >= 0 && x < camera->horRes && y >= 0 && y < camera->verRes)
+					draw(x, y, c);
 			}
 		}
 	}
 }
 
-void Scene::drawMeshes(Camera* camera){
+Vec3 Scene::perspectiveDivide(Vec4 point){
+		Vec3 result;
+		result.x = point.x / point.t;
+		result.y = point.y / point.t;
+		result.z = point.z / point.t;
+		return result;
+	}
+
+void Scene::drawMeshes(Camera* camera, Matrix4 viewPortMatrix){
 	for(int meshNumber = 0; meshNumber < this->meshes.size(); meshNumber++){
-		for(int i = this->meshes[meshNumber]->numberOfTriangles - 1; i >= 0; i--){
+		for(int i = 0; i < this->meshes[meshNumber]->numberOfTriangles; i++){
 			if(!cullingEnabled || (cullingEnabled && backfaceCulling(camera->w, this->meshes[meshNumber]->triangles[i],meshNumber))){
 				if(this->meshes[meshNumber]->type == 0){ // wireframe
 					int id1 = this->meshes[meshNumber]->triangles[i].getFirstVertexId();
 					int id2 = this->meshes[meshNumber]->triangles[i].getSecondVertexId();
 					int id3 = this->meshes[meshNumber]->triangles[i].getThirdVertexId();
 					// for id1 and id2
-					midpointWithInterpolation(this->transformedVertices[meshNumber][id1-1].x,
-					this->transformedVertices[meshNumber][id1 - 1].y,
-					this->transformedVertices[meshNumber][id2 - 1].x,
-					this->transformedVertices[meshNumber][id2 - 1].y,
-					*this->colorsOfVertices[this->transformedVertices[meshNumber][id1 - 1].colorId - 1],
-					*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1]);
+					Vec3 p1, p2;
+					Vec4 pv1, pv2;
+					bool visible;
+					visible = false;
+					vector<Vec3> tmp = clipping(this->transformedVertices[meshNumber][id1 - 1], this->transformedVertices[meshNumber][id2 - 1], visible);
+					if(visible){
+						p1 = tmp[0];
+						p2 = tmp[1];
+
+						pv1 = multiplyMatrixWithVec4(viewPortMatrix, Vec4(p1.x, p1.y, p1.z, 1, this->transformedVertices[meshNumber][id1 - 1].colorId));
+						pv2 = multiplyMatrixWithVec4(viewPortMatrix, Vec4(p2.x, p2.y, p2.z, 1, this->transformedVertices[meshNumber][id2 - 1].colorId));
+											
+						p1 = perspectiveDivide(pv1);
+						p2 = perspectiveDivide(pv2);						
+
+						midpointWithInterpolation(p1.x, p1.y, p2.x,	p2.y,
+						*this->colorsOfVertices[this->transformedVertices[meshNumber][id1 - 1].colorId - 1],
+						*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1], camera);
+					}
+					
 
 					// for id1 and id3 
-					midpointWithInterpolation(this->transformedVertices[meshNumber][id1-1].x,
-					this->transformedVertices[meshNumber][id1 - 1].y,
-					this->transformedVertices[meshNumber][id3 - 1].x,
-					this->transformedVertices[meshNumber][id3 - 1].y,
-					*this->colorsOfVertices[this->transformedVertices[meshNumber][id1 - 1].colorId - 1],
-					*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
+					vector<Vec3> tmp2 = clipping(this->transformedVertices[meshNumber][id1 - 1], this->transformedVertices[meshNumber][id3 - 1], visible);
+					if(visible){
+						p1 = tmp2[0];
+						p2 = tmp2[1];
+
+						pv1 = multiplyMatrixWithVec4(viewPortMatrix, Vec4(p1.x, p1.y, p1.z, 1, this->transformedVertices[meshNumber][id1 - 1].colorId));
+						pv2 = multiplyMatrixWithVec4(viewPortMatrix, Vec4(p2.x, p2.y, p2.z, 1, this->transformedVertices[meshNumber][id3 - 1].colorId));
+											
+						p1 = perspectiveDivide(pv1);
+						p2 = perspectiveDivide(pv2);
+
+						midpointWithInterpolation(p1.x, p1.y, p2.x,	p2.y,
+						*this->colorsOfVertices[this->transformedVertices[meshNumber][id1 - 1].colorId - 1],
+						*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1], camera);
+					}
+					
 
 					//for id2 and id3
-					midpointWithInterpolation(this->transformedVertices[meshNumber][id2-1].x,
-					this->transformedVertices[meshNumber][id2 - 1].y,
-					this->transformedVertices[meshNumber][id3 - 1].x,
-					this->transformedVertices[meshNumber][id3 - 1].y,
-					*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1],
-					*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
+					vector<Vec3> tmp3 = clipping(this->transformedVertices[meshNumber][id2 - 1], this->transformedVertices[meshNumber][id3 - 1], visible);
+					if(visible){
+						p1 = tmp3[0];
+						p2 = tmp3[1];
+
+						pv1 = multiplyMatrixWithVec4(viewPortMatrix, Vec4(p1.x, p1.y, p1.z, 1, this->transformedVertices[meshNumber][id2 - 1].colorId));
+						pv2 = multiplyMatrixWithVec4(viewPortMatrix, Vec4(p2.x, p2.y, p2.z, 1, this->transformedVertices[meshNumber][id3 - 1].colorId));
+											
+						p1 = perspectiveDivide(pv1);
+						p2 = perspectiveDivide(pv2);
+						
+						midpointWithInterpolation(p1.x, p1.y, p2.x,	p2.y,
+						*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1],
+						*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1], camera);
+					}			
 				} else{ // solid
 				int id1 = this->meshes[meshNumber]->triangles[i].getFirstVertexId();
 				int id2 = this->meshes[meshNumber]->triangles[i].getSecondVertexId();
 				int id3 = this->meshes[meshNumber]->triangles[i].getThirdVertexId();
-				triangleRasterization(this->transformedVertices[meshNumber][id1-1].x, 
-				this->transformedVertices[meshNumber][id1 - 1].y,
-				this->transformedVertices[meshNumber][id2 - 1].x,
-				this->transformedVertices[meshNumber][id2 - 1].y,
-				this->transformedVertices[meshNumber][id3 - 1].x,
-				this->transformedVertices[meshNumber][id3 - 1].y,
+				
+				Vec3 p1, p2, p3;
+				p1 = this->transformedVertices[meshNumber][id1 - 1];
+				p2 = this->transformedVertices[meshNumber][id2 - 1];
+				p3 = this->transformedVertices[meshNumber][id3 - 1];
+
+				Vec4 pv1, pv2, pv3;
+				pv1 = multiplyMatrixWithVec4(viewPortMatrix, Vec4(p1.x, p1.y, p1.z, 1, this->transformedVertices[meshNumber][id1 - 1].colorId));
+				pv2 = multiplyMatrixWithVec4(viewPortMatrix, Vec4(p2.x, p2.y, p2.z, 1, this->transformedVertices[meshNumber][id2 - 1].colorId));
+				pv3 = multiplyMatrixWithVec4(viewPortMatrix, Vec4(p3.x, p3.y, p3.z, 1, this->transformedVertices[meshNumber][id3 - 1].colorId));
+
+				p1 = perspectiveDivide(pv1);
+				p2 = perspectiveDivide(pv2);
+				p3 = perspectiveDivide(pv3);
+
+				triangleRasterization(p1.x, p1.y, p2.x,	p2.y, p3.x, p3.y,
 				*this->colorsOfVertices[this->transformedVertices[meshNumber][id1 - 1].colorId - 1],
 				*this->colorsOfVertices[this->transformedVertices[meshNumber][id2 - 1].colorId - 1],
-				*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1]);
+				*this->colorsOfVertices[this->transformedVertices[meshNumber][id3 - 1].colorId - 1], camera);
 			}
 			}
 			
@@ -652,7 +709,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 		transformVertices(cameraMatrix, viewPortMatrix, meshNumber);
 
 	}
-	drawMeshes(camera);
+	drawMeshes(camera, viewPortMatrix);
 
 	clearTransformed();
 }

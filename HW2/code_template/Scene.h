@@ -56,14 +56,15 @@ public:
 	void transformVertices(Matrix4 cameraMatrix, Matrix4 viewPortMatrix, int meshNumber);
 	bool backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber);
 
-	void midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, Color c1);
+	void midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, Color c1, Camera* camera);
 	float f01(int x, int y, int x0, int y0, int x1, int y1);
 	float f12(int x, int y, int x1, int y1, int x2, int y2);
 	float f20(int x, int y, int x2, int y2, int x0, int y0);
-	void triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2, Color c0, Color c1, Color c2);
+	void triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2, Color c0, Color c1, Color c2, Camera* camera);
 	void draw(int x, int y, Color c);
-	void drawMeshes(Camera* camera);
+	void drawMeshes(Camera* camera, Matrix4 viewPortMatrix);
 	void clearTransformed();
+	Vec3 perspectiveDivide(Vec4 point);
 
 };
 
