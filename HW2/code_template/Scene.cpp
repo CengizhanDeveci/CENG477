@@ -575,9 +575,9 @@ void Scene::triangleRasterization(int x0, int y0, int x1, int y1, int x2, int y2
 				c.g = alpha * c0.g + beta * c1.g + gamma * c2.g;
 				c.b = alpha * c0.b + beta * c1.b + gamma * c2.b;
 				
-				c.r = round(c.r);
-				c.g = round(c.g);
-				c.b = round(c.b);
+				c.r = makeBetweenZeroAnd255(round(c.r));
+				c.g = makeBetweenZeroAnd255(round(c.g));
+				c.b = makeBetweenZeroAnd255(round(c.b));
 				if(x >= 0 && x < camera->horRes && y >= 0 && y < camera->verRes)
 					draw(x, y, c);
 			}
