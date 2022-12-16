@@ -54,7 +54,7 @@ public:
 	Matrix4 cameraTransformation(Camera* camera);
 	vector<vector<Vec3>> transformedVertices;
 	void transformVertices(Matrix4 cameraMatrix, Matrix4 viewPortMatrix, int meshNumber);
-	bool backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber);
+	bool backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber, Matrix4 viewportMatrix);
 
 	void midpointWithInterpolation(int x0, int y0, int x1, int y1, Color c0, Color c1, Camera* camera);
 	float f01(int x, int y, int x0, int y0, int x1, int y1);

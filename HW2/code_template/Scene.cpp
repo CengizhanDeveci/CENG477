@@ -366,14 +366,22 @@ Vec3 findNormal(Vec3 a, Vec3 b, Vec3 c){
 }
 
 
-bool Scene::backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber){
+bool Scene::backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber, Matrix4 viewportMatrix){
 	Vec3 a = this->transformedVertices[meshNumber][triangle.getFirstVertexId() - 1];
 	Vec3 b = this->transformedVertices[meshNumber][triangle.getSecondVertexId() - 1];
 	Vec3 c = this->transformedVertices[meshNumber][triangle.getThirdVertexId() - 1];
-	Vec3 n = findNormal(a, b, c);
+	Vec4 a4 = multiplyMatrixWithVec4(viewportMatrix, Vec4(a.x, a.y, a.z, 1, a.colorId));
+	Vec4 b4 = multiplyMatrixWithVec4(viewportMatrix, Vec4(b.x, b.y, b.z, 1, b.colorId));
+	Vec4 c4 = multiplyMatrixWithVec4(viewportMatrix, Vec4(c.x, c.y, c.z, 1, c.colorId));
 
+	a = perspectiveDivide(a4);
+	b = perspectiveDivide(b4);
+	c = perspectiveDivide(c4);
+
+	Vec3 n = findNormal(a, b, c);
+	
 	double dot = dotProductVec3(inverseW, n);
-	return dot > 0;
+	return (dot > 0);
 }
 
 void Scene::draw(int x, int y, Color c) {
@@ -596,7 +604,7 @@ Vec3 Scene::perspectiveDivide(Vec4 point){
 void Scene::drawMeshes(Camera* camera, Matrix4 viewPortMatrix){
 	for(int meshNumber = 0; meshNumber < this->meshes.size(); meshNumber++){
 		for(int i = 0; i < this->meshes[meshNumber]->numberOfTriangles; i++){
-			if(!cullingEnabled || (cullingEnabled && backfaceCulling(camera->w, this->meshes[meshNumber]->triangles[i],meshNumber))){
+			if(!cullingEnabled || (cullingEnabled && backfaceCulling(camera->w, this->meshes[meshNumber]->triangles[i],meshNumber, viewPortMatrix))){
 				if(this->meshes[meshNumber]->type == 0){ // wireframe
 					int id1 = this->meshes[meshNumber]->triangles[i].getFirstVertexId();
 					int id2 = this->meshes[meshNumber]->triangles[i].getSecondVertexId();
