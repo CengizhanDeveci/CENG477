@@ -23,24 +23,25 @@
 
 using namespace std;
 
-#define colorNumber 4
+#define colorNumber 5
 
 float colors[colorNumber][3] = {{1.0, 0.2, 0.2},
                                 {0.5, 0.5, 0.5},
                                 {0.0, 0.2, 0.8},
-                                {0.6, 0.2, 0.1}};
+                                {0.6, 0.2, 0.1},
+                                {0.3, 0.7, 0.3}};
 
 int x,y;
 
 int score = 0, moveCount = 0;
 
-float*** colorsObject;
+int** colorsObject;
 bool** explosion;
 
 GLuint gProgram[2];
 GLint gIntensityLoc;
 float gIntensity = 1000;
-int gWidth = 640, gHeight = 480;
+int gWidth = 640, gHeight = 600;
 
 struct Vertex
 {
@@ -95,6 +96,14 @@ struct Character {
 
 std::map<GLchar, Character> Characters;
 
+float*** positions;
+bool hitted = false;
+
+double difference;
+float*** currentPositions;
+bool matched = false;
+
+bool** downedObjects;
 
 bool ParseObj(const string& fileName)
 {
@@ -282,7 +291,6 @@ void createVS(GLuint& program, const string& filename)
 
     char output[1024] = {0};
     glGetShaderInfoLog(vs, 1024, &length, output);
-    printf("VS compile log: %s\n", output);
 
     glAttachShader(program, vs);
 }
@@ -306,7 +314,6 @@ void createFS(GLuint& program, const string& filename)
 
     char output[1024] = {0};
     glGetShaderInfoLog(fs, 1024, &length, output);
-    printf("FS compile log: %s\n", output);
 
     glAttachShader(program, fs);
 }
@@ -331,7 +338,6 @@ void initShaders()
     glUseProgram(gProgram[0]);
 
     gIntensityLoc = glGetUniformLocation(gProgram[0], "intensity");
-    cout << "gIntensityLoc = " << gIntensityLoc << endl;
     glUniform1f(gIntensityLoc, gIntensity);
 }
 
@@ -373,13 +379,6 @@ void initVBO()
         minZ = std::min(minZ, gVertices[i].z);
         maxZ = std::max(maxZ, gVertices[i].z);
     }
-
-    std::cout << "minX = " << minX << std::endl;
-    std::cout << "maxX = " << maxX << std::endl;
-    std::cout << "minY = " << minY << std::endl;
-    std::cout << "maxY = " << maxY << std::endl;
-    std::cout << "minZ = " << minZ << std::endl;
-    std::cout << "maxZ = " << maxZ << std::endl;
 
     for (int i = 0; i < gNormals.size(); ++i)
     {
@@ -432,7 +431,7 @@ void initFonts(int windowWidth, int windowHeight)
 
     // Load font as face
     FT_Face face;
-    if (FT_New_Face(ft, "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf", 0, &face))
+    if (FT_New_Face(ft, "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf", 0, &face))
     {
         std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
     }
@@ -512,20 +511,21 @@ void init(string objName)
 }
 
 void setColors(){
-    cout << "here" << endl;
-    colorsObject = new float**[x];
+    colorsObject = new int*[x];
     explosion = new bool*[x];
+    downedObjects = new bool*[x];
     for(int i = 0; i < x; i++){
         explosion[i] = new bool[y];
-        colorsObject[i] = new float*[y];
+        downedObjects[i] = new bool[y];
+        colorsObject[i] = new int[y];
         for(int j = 0; j < y; j++){
-            colorsObject[i][j] = new float[3];
             int randomNumber = rand() % colorNumber;
-            colorsObject[i][j][0] = colors[randomNumber][0];
-            colorsObject[i][j][1] = colors[randomNumber][1];
-            colorsObject[i][j][2] = colors[randomNumber][2];
+            colorsObject[i][j] = randomNumber;
+            colorsObject[i][j] = randomNumber;
+            colorsObject[i][j] = randomNumber;
 
             explosion[i][j] = false;
+            downedObjects[i][j] = false;
         }
     }
 }
@@ -590,6 +590,171 @@ void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, gl
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void setPositions(){
+    positions = new float**[x];
+    currentPositions = new float**[x];
+    for(int i = 0; i < x; i++){
+        positions[i] = new float*[y];
+        currentPositions[i] = new float*[y];
+        for(int j = 0; j < y; j++){
+            positions[i][j] = new float[3];
+            currentPositions[i][j] = new float[3];
+            positions[i][j][0] = -10. + 10. / x + 20. / x * i;
+            positions[i][j][1] = -8 + 2. / y + 18. / y * j;
+            positions[i][j][2] = -10.;
+            currentPositions[i][j][0] = -10. + 10. / x + 20. / x * i;
+            currentPositions[i][j][1] = -8 + 2. / y + 18. / y * j;
+            currentPositions[i][j][2] = -10.;
+        }
+    }
+    difference = positions[0][1][1] - positions[0][0][1];
+
+}
+
+void findHit(int xpos, int ypos){
+    double clickx = double(xpos) / double(gWidth) * 20 - 10;
+    double clicky = double(ypos) / double(gHeight) * 20 - 10;
+
+    int x1 = x - 1;
+    int y1 = y - 1;
+
+    // checking the object's x value
+    for(int i = 0; i < x; i++){
+        if(positions[i][0][0] > clickx){
+            if(i != 0){
+                if(positions[i][0][0] - clickx > clickx - positions[i - 1][0][0]){
+                    x1 = i - 1;
+                    break;
+                }else{
+                    x1 = i;
+                    break;
+                }
+            }else{
+                x1 = i; 
+                break;
+            }
+        }
+    }
+
+    // checking the object's y value
+    for(int i = 0; i < y; i++){
+        if(positions[0][i][1] > clicky){
+            if(i != 0){
+                if(positions[0][i][1] - clicky > clicky - positions[0][i - 1][1]){
+                    y1 = i - 1;
+                    break;
+                }else{
+                    y1 = i;
+                    break;
+                }
+            }else{
+                y1 = i; 
+                break;
+            }
+        }
+    }
+    if(y > 1 && y1 == y - 1){
+        double difference = positions[0][1][1] - positions[0][0][1];
+        if(positions[0][y - 1][1] + (difference / 2) < clicky){
+            y1 = -1;
+        }
+    }
+
+    if(y1 != -1){
+        explosion[x1][y - y1 - 1] = true;
+        hitted = true;
+        moveCount++;
+    }
+}
+
+void match(){
+    int result = 0;
+    for(int i = 0; i < x; i++){
+        int cur = colorsObject[i][0];
+        int count = 1;
+        for(int j = 1; j < x; j++){
+            if(colorsObject[i][j] == cur){
+                count++;
+            }else{
+                cur = colorsObject[i][j];
+                count = 1;
+            }
+            
+            if(count == 3){
+                matched = true;
+                explosion[i][j] = true;
+                explosion[i][j - 1] = true;
+                explosion[i][j - 2] = true;
+            }else if(count > 3) explosion[i][j] = true;
+        }
+    }
+
+    for(int j = 0; j < y; j++){
+        int cur = colorsObject[0][j];
+        int count = 1;
+        for(int i = 1; i < x; i++){
+            if(colorsObject[i][j] == cur){
+                count++;
+            }else{
+                cur = colorsObject[i][j];
+                count = 1;
+            }
+            
+            if(count == 3){
+                matched = true;
+                explosion[i][j] = true;
+                explosion[i - 1][j] = true;
+                explosion[i - 2][j] = true;
+            }else if(count > 3) explosion[i][j] = true;
+        }
+    }
+    for(int i = 0; i < x; i++){
+        for(int j = 0; j < y; j++){
+            if(explosion[i][j]) result++;
+        }
+    }
+    score += result;
+}
+
+void goingDown(){
+    for(int i = 0; i < x; i++){
+        int count = 0;
+        for(int j = 0; j < y; j++){
+            if(explosion[i][j]) count++;
+            else{
+                colorsObject[i][j - count] = colorsObject[i][j];
+                currentPositions[i][j - count][1] = positions[i][j][1];
+                downedObjects[i][j - count] = true;
+            }
+        }
+        
+        for(int cnt = 1; count > 0; count--, cnt++){
+            int randomNumber = rand() % colorNumber;
+            colorsObject[i][y - count] = randomNumber;
+            currentPositions[i][y - count][1] = positions[i][y - 1][1] + cnt * difference;
+            downedObjects[i][y - count] = true;
+        }
+
+    }
+}
+
+void setDefaultExplosion(){
+    for(int i = 0; i < x; i++){
+        for(int j = 0; j < y; j++){
+            explosion[i][j] = false;
+        }
+    }
+}
+
+bool anyDowned(){
+    for(int i = 0; i < x; i++){
+        for(int j = 0; j < y; j++){
+            if(downedObjects[i][j]) return true;
+        }
+    }
+    return false;
+}
+
 void display()
 {
     glClearColor(0, 0, 0, 1);
@@ -607,24 +772,26 @@ void display()
 	//glLoadIdentity();
 	//glTranslatef(-2, 0, -10);
 	//glRotatef(angle, 0, 1, 0);
-    static int scaleNumber = 1;
+    static double scaleNumber = 1;
     for(int i = 0; i < x; i++){
         for(int j = 0; j < y; j++){
             glLoadIdentity();
-            glUniform1f(krUniform, colorsObject[i][j][0]);
-            glUniform1f(kgUniform, colorsObject[i][j][1]);
-            glUniform1f(kbUniform, colorsObject[i][j][2]);
-            glTranslatef(-10. + 10. / x + 20. / x * i, -8 + 2. / y + 18. / y * j, -10.);
-            cout << "x: " << i << " -> " << -10. + 10. / x + 20. / x * i << endl;
-            cout << "y: " << j << " -> " << -8 + 2. / y + 18. / y * j << endl;
+            glUniform1f(krUniform, colors[colorsObject[i][j]][0]);
+            glUniform1f(kgUniform, colors[colorsObject[i][j]][1]);
+            glUniform1f(kbUniform, colors[colorsObject[i][j]][2]);
+            glTranslatef(currentPositions[i][j][0], currentPositions[i][j][1], currentPositions[i][j][2]);
             glRotatef(angle, 0, 1, 0);
             if(!explosion[i][j])
                 glScalef(4.5 / x, 4.5 / y, 4.5 / x);
             else{
                 glScalef(4.5 / x * scaleNumber, 4.5 / y * scaleNumber, 4.5 / x * scaleNumber);
-                if(scaleNumber >= 1.5){
-                    explosion[i][j] = false;
-                    // add function which let upper bunnies go down
+            }
+
+            if(downedObjects[i][j]){
+                currentPositions[i][j][1] -= 0.05;
+                if(currentPositions[i][j][1] < positions[i][j][1]){
+                    downedObjects[i][j] = false;
+                    currentPositions[i][j][1] = positions[i][j][1];
                 }
             }
             
@@ -632,14 +799,29 @@ void display()
         }
     }
 
+    
+
+    if(hitted || matched){
+        scaleNumber += 0.01;
+    }
+    
+    if(scaleNumber >= 1.5){
+        hitted = false;
+        matched = false;
+        goingDown();
+        setDefaultExplosion();
+        scaleNumber = 1;
+    }
+
     assert(glGetError() == GL_NO_ERROR);
 
-    renderText("Moves: " + to_string(moveCount) + " Score: " + to_string(score), 0, 0, 1, glm::vec3(0, 1, 1));
+    renderText("Moves: " + to_string(moveCount) + " Score: " + to_string(score), 0, 0, 1, glm::vec3(1, 1, 0));
 
     assert(glGetError() == GL_NO_ERROR);
 
 	angle += 0.5;
 }
+
 void reshape(GLFWwindow* window, int w, int h){
 
     w = w < 1 ? 1 : w;
@@ -659,40 +841,15 @@ void reshape(GLFWwindow* window, int w, int h){
 
 }
 
-void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-    {
-        glfwSetWindowShouldClose(window, GL_TRUE);
-    }
-    else if (key == GLFW_KEY_V && action == GLFW_PRESS)
-    {
-        cout << "V pressed" << endl;
-        glUseProgram(gProgram[0]);
-    }
-    else if (key == GLFW_KEY_D && action == GLFW_PRESS)
-    {
-        cout << "D pressed" << endl;
-        gIntensity /= 1.5;
-        cout << "gIntensity = " << gIntensity << endl;
-        glUseProgram(gProgram[0]);
-        glUniform1f(gIntensityLoc, gIntensity);
-    }
-    else if (key == GLFW_KEY_B && action == GLFW_PRESS)
-    {
-        cout << "B pressed" << endl;
-        gIntensity *= 1.5;
-        cout << "gIntensity = " << gIntensity << endl;
-        glUseProgram(gProgram[0]);
-        glUniform1f(gIntensityLoc, gIntensity);
-    }
-}
-
 void mainLoop(GLFWwindow* window)
-{
+{   
+    setPositions();
     setColors();
     while (!glfwWindowShouldClose(window))
     {
+        if(!matched && !hitted && !anyDowned()){
+            match();
+        }
         display();
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -701,12 +858,8 @@ void mainLoop(GLFWwindow* window)
 
 void restart(){
     for(int i = 0; i < x; i++){
-        for(int j = 0; j < y; j++){
-            delete[] colorsObject[i][j];
-        }
         delete[] colorsObject[i];
         delete[] explosion[i];
-
     }
     delete[] explosion;
     delete[] colorsObject;
@@ -729,7 +882,9 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods){
     if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS){
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
-        cout << "xpos: " << xpos << " ypos: " << ypos << endl;
+        if(!hitted && !matched && !anyDowned()){
+            findHit(xpos, ypos);
+        }
     }
 
 }
@@ -777,7 +932,7 @@ int main(int argc, char** argv){
     strcpy(rendererInfo, (const char*) glGetString(GL_RENDERER));
     strcat(rendererInfo, " - ");
     strcat(rendererInfo, (const char*) glGetString(GL_VERSION));
-    glfwSetWindowTitle(window, rendererInfo);
+    glfwSetWindowTitle(window, "CENG477 - THE3 - Rabbit Crush");
 
     init(objName);
 
