@@ -863,6 +863,7 @@ void restart(){
     }
     delete[] explosion;
     delete[] colorsObject;
+    setPositions();
     setColors();
     score = 0;
     moveCount = 0;
