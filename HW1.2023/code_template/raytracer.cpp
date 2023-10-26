@@ -352,6 +352,36 @@ parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &cam
                 color.z += diffuse.z + specular.z;
             }
         }
+
+        if(scene.materials[hit.materialID - 1].is_mirror && recursionCount > 0)
+        {
+            parser::Vec3f mirrorColor;
+
+            float cosTheta = DotProduct(ray.direction, hit.normal);
+            parser::Vec3f wr;
+            wr.x = -2 * hit.normal.x * cosTheta + ray.direction.x;
+            wr.y = -2 * hit.normal.y * cosTheta + ray.direction.y;
+            wr.z = -2 * hit.normal.z * cosTheta + ray.direction.z;
+            wr = NormalizeVec3f(wr);
+            
+            parser::Vec3f wiEpsilon;
+            wiEpsilon.x = wr.x * scene.shadow_ray_epsilon;
+            wiEpsilon.y = wr.y * scene.shadow_ray_epsilon;
+            wiEpsilon.z = wr.z * scene.shadow_ray_epsilon;
+
+            Ray reflectionRay;
+            reflectionRay.origin = AddVec3f(hit.intersectionPoint, wiEpsilon);
+            reflectionRay.direction = wr;
+
+            Hit newHit = FindHit(scene, reflectionRay);
+            if(!(newHit.type == hit.type && newHit.objectID == hit.objectID))
+            {
+                mirrorColor = ComputeColor(scene, camera, newHit, reflectionRay, recursionCount - 1);
+                color.x += mirrorColor.x * scene.materials[hit.materialID - 1].mirror.x;
+                color.y += mirrorColor.y * scene.materials[hit.materialID - 1].mirror.y;
+                color.z += mirrorColor.z * scene.materials[hit.materialID - 1].mirror.z;
+            }
+        }
     }
     else
     {
