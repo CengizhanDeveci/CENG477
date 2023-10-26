@@ -19,9 +19,9 @@ Ray ray::GenerateRay(const parser::Camera & camera, int i, int j)
     w = ray::NegateVec3f(camera.gaze);
     v = camera.up;
     u = ray::CrossProduct(v, w);
-    ray::NormalizeVec3f(u);
-    ray::NormalizeVec3f(v);
-    ray::NormalizeVec3f(w);
+    u = ray::NormalizeVec3f(u);
+    v = ray::NormalizeVec3f(v);
+    w = ray::NormalizeVec3f(w);
 
     float su = (i + 0.5f) * ((right - left) / camera.image_width);
     float sv = (j + 0.5f) * ((top - bottom) / camera.image_height);
@@ -33,17 +33,20 @@ Ray ray::GenerateRay(const parser::Camera & camera, int i, int j)
 
     result.origin = camPos;
     result.direction = ray::SubtractVec3f(s, camPos);
-    ray::NormalizeVec3f(result.direction);
+    result.direction = ray::NormalizeVec3f(result.direction);
     
     return result;
 }
 
-void ray::NormalizeVec3f(parser::Vec3f& vec)
+parser::Vec3f ray::NormalizeVec3f(parser::Vec3f& vec)
 {
+    parser::Vec3f result;
     float sumSqrt = sqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
-    vec.x /= sumSqrt;
-    vec.y /= sumSqrt;
-    vec.z /= sumSqrt;
+    result.x = vec.x / sumSqrt;
+    result.y = vec.y / sumSqrt;
+    result.z = vec.z / sumSqrt;
+
+    return result;
 }
 
 parser::Vec3f ray::CrossProduct(const parser::Vec3f &v1, const parser::Vec3f &v2)

@@ -23,7 +23,7 @@ namespace ray
     };
 
     Ray GenerateRay(const parser::Camera &camera, int i, int j);
-    void NormalizeVec3f(parser::Vec3f& vec);
+    parser::Vec3f NormalizeVec3f(parser::Vec3f& vec);
     parser::Vec3f CrossProduct(const parser::Vec3f &v1, const parser::Vec3f &v2);
     inline float DotProduct(const parser::Vec3f &v1, const parser::Vec3f &v2) {return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;};
     parser::Vec3f AddVec3f(const parser::Vec3f &v1, const parser::Vec3f &v2);

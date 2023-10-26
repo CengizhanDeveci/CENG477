@@ -52,7 +52,7 @@ Hit HitSphere(const Ray &ray, parser::Vec3f &center, float radius, int materialI
 		hit.normal.x /= radius;
 		hit.normal.y /= radius;
 		hit.normal.z /= radius;
-        NormalizeVec3f(hit.normal);
+        hit.normal = NormalizeVec3f(hit.normal);
     }
 
     return hit;
@@ -68,7 +68,7 @@ Hit HitTriangle(const Ray &ray, const parser::Scene &scene, parser::Triangle &tr
 
     parser::Vec3f normal;
     normal = CrossProduct(SubtractVec3f(c, b), SubtractVec3f(a, b));
-    NormalizeVec3f(normal);
+    normal = NormalizeVec3f(normal);
 
     // some calculations for barycentric coordinates
     float detA = Determinant(SubtractVec3f(a, b), SubtractVec3f(a, c), ray.direction);
@@ -88,7 +88,7 @@ Hit HitTriangle(const Ray &ray, const parser::Scene &scene, parser::Triangle &tr
 	hit.t = t;
 	hit.intersectionPoint = FindIntersectionPoint(ray, t);
 	hit.normal = CrossProduct(SubtractVec3f(b, a), SubtractVec3f(c, a));
-	NormalizeVec3f(hit.normal);
+	hit.normal = NormalizeVec3f(hit.normal);
 
 	return hit;
 }
@@ -106,7 +106,7 @@ Hit HitMesh(const Ray &ray, const parser::Mesh &mesh, const parser::Scene &scene
 
         parser::Vec3f normal;
         normal = CrossProduct(SubtractVec3f(c, b), SubtractVec3f(a, b));
-        NormalizeVec3f(normal);
+        normal = NormalizeVec3f(normal);
 
         // some calculations for barycentric coordinates
         float detA = Determinant(SubtractVec3f(a, b), SubtractVec3f(a, c), ray.direction);
@@ -141,6 +141,21 @@ Hit HitMesh(const Ray &ray, const parser::Mesh &mesh, const parser::Scene &scene
     return hit;
 }
 
+parser::Vec3f FindIrradiance(const parser::PointLight &pointLight, const parser::Vec3f &intersectionPoint)
+{
+    parser::Vec3f result;
+    parser::Vec3f d = SubtractVec3f(pointLight.position, intersectionPoint);
+    float dDotD = DotProduct(d, d);
+
+    if(dDotD <= 0) result;
+
+    result.x = pointLight.intensity.x / dDotD;
+    result.y = pointLight.intensity.y / dDotD;
+    result.z = pointLight.intensity.z / dDotD;
+    
+    return result;
+}
+
 
 parser::Vec3f AmbientShading(const parser::Scene &scene, int materialID){
     parser::Vec3f result;
@@ -148,6 +163,44 @@ parser::Vec3f AmbientShading(const parser::Scene &scene, int materialID){
     result.y = scene.materials[materialID - 1].ambient.y * scene.ambient_light.y;
     result.z = scene.materials[materialID - 1].ambient.z * scene.ambient_light.z;
     return result;
+}
+
+parser::Vec3f DiffuseShading(const parser::PointLight &pointLight, const parser::Scene &scene, const Hit &hit)
+{
+    parser::Vec3f color;
+    parser::Vec3f irradiance = FindIrradiance(pointLight, hit.intersectionPoint);
+    parser::Vec3f wi = SubtractVec3f(pointLight.position, hit.intersectionPoint);
+    wi = NormalizeVec3f(wi);
+
+    float cosThetaPrime = DotProduct(wi, hit.normal);
+    if(cosThetaPrime <= 0) {color.x = 0; color.y=0; color.z=0;return color;}
+
+    color.x = scene.materials[hit.materialID - 1].diffuse.x * cosThetaPrime * irradiance.x;
+    color.y = scene.materials[hit.materialID - 1].diffuse.y * cosThetaPrime * irradiance.y;
+    color.z = scene.materials[hit.materialID - 1].diffuse.z * cosThetaPrime * irradiance.z;
+
+    return color;
+}
+
+parser::Vec3f SpecularShading(const parser::PointLight &pointLight, const parser::Scene &scene, const Ray &ray, const Hit &hit)
+{
+    parser::Vec3f color;
+    parser::Vec3f irradiance = FindIrradiance(pointLight, hit.intersectionPoint);
+
+    parser::Vec3f wi = SubtractVec3f(pointLight.position, hit.intersectionPoint);
+	wi = NormalizeVec3f(wi);
+
+	parser::Vec3f h = SubtractVec3f(wi, ray.direction);
+	h = NormalizeVec3f(h);
+
+	float cos_alpha_prime = DotProduct(hit.normal, h);
+	if(cos_alpha_prime <= 0) {color.x = 0; color.y=0; color.z=0;return color;}
+
+    color.x = scene.materials[hit.materialID - 1].specular.x * pow(cos_alpha_prime, scene.materials[hit.materialID - 1].phong_exponent) * irradiance.x;
+	color.y = scene.materials[hit.materialID - 1].specular.y * pow(cos_alpha_prime, scene.materials[hit.materialID - 1].phong_exponent) * irradiance.y;
+	color.z = scene.materials[hit.materialID - 1].specular.z * pow(cos_alpha_prime, scene.materials[hit.materialID - 1].phong_exponent) * irradiance.z;
+
+    return color;
 }
 
 Hit FindHit(const parser::Scene &scene, const Ray &ray)
@@ -219,6 +272,52 @@ Hit FindHit(const parser::Scene &scene, const Ray &ray)
     return hit;
 }
 
+bool ShadowCheck(const parser::Scene &scene, Ray shadowRay, float t)
+{
+    // loop for sphere hit
+    int spheresSize = scene.spheres.size();
+    for (int sphereNumber = 0; sphereNumber < spheresSize; sphereNumber++)
+    {
+        parser::Sphere currentSphere = scene.spheres[sphereNumber];
+        parser::Vec3f center = scene.vertex_data[currentSphere.center_vertex_id - 1];
+        float radius = currentSphere.radius;
+
+        Hit hitCheck = HitSphere(shadowRay, center, radius, currentSphere.material_id, sphereNumber);
+        if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
+        {
+            return true;
+        }
+    }
+    
+    // loop for triangle hit
+    int trianglesSize = scene.triangles.size();
+    for (int triangleNumber = 0; triangleNumber < trianglesSize; triangleNumber++)
+    {
+        parser::Triangle currentTriangle = scene.triangles[triangleNumber];
+        Hit hitCheck = HitTriangle(shadowRay, scene, currentTriangle, triangleNumber);
+
+        if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
+        {
+            return true;
+        }
+    }
+
+    // loop for meshes hit
+    int meshesSize = scene.meshes.size();
+    for (int meshNumber = 0; meshNumber < meshesSize; meshNumber++)
+    {
+        parser::Mesh currentMesh = scene.meshes[meshNumber];
+        Hit hitCheck = HitMesh(shadowRay, currentMesh, scene, meshNumber);
+
+        if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
+        {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &camera, const Hit &hit, const Ray &ray, int recursionCount)
 {
     parser::Vec3f color;
@@ -226,12 +325,39 @@ parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &cam
     if(hit.hit)
     {
         color = AmbientShading(scene, hit.materialID);
+
+        for(int lightNumber = 0; lightNumber < scene.point_lights.size(); lightNumber++)
+        {
+            parser::Vec3f wiEpsilon;
+            wiEpsilon.x = hit.normal.x * scene.shadow_ray_epsilon;
+            wiEpsilon.y = hit.normal.y * scene.shadow_ray_epsilon;
+            wiEpsilon.z = hit.normal.z * scene.shadow_ray_epsilon;
+
+            Ray shadowRay;
+            shadowRay.origin = AddVec3f(wiEpsilon, hit.intersectionPoint);
+            parser::Vec3f tmp1 = hit.intersectionPoint;
+            parser::Vec3f tmp2 = scene.point_lights[lightNumber].position;
+            shadowRay.direction = SubtractVec3f(tmp2, tmp1);
+            shadowRay.direction = NormalizeVec3f(shadowRay.direction);
+            float tLight = (tmp2.x - shadowRay.origin.x) / shadowRay.direction.x;
+            bool isShadow = ShadowCheck(scene, shadowRay, tLight);
+
+            if(!isShadow)
+            {
+                parser::Vec3f diffuse = DiffuseShading(scene.point_lights[lightNumber], scene, hit);
+                parser::Vec3f specular = SpecularShading(scene.point_lights[lightNumber], scene, ray, hit);
+
+                color.x += diffuse.x + specular.x;
+                color.y += diffuse.y + specular.y;
+                color.z += diffuse.z + specular.z;
+            }
+        }
     }
     else
     {
-        color.x = 0;
-        color.y = 0;
-        color.z = 0;
+        color.x = scene.background_color.x;
+        color.y = scene.background_color.y;
+        color.z = scene.background_color.z;
     }
     return color;
 }
@@ -254,13 +380,13 @@ int main(int argc, char* argv[])
         for(int j = 0; j < height; j++)
         {
             for(int i = 0; i < width; i++)
-            {
+            {   
                 Ray ray = GenerateRay(scene.cameras[cameraNo], i, j);
                 Hit hit = FindHit(scene, ray);
                 parser::Vec3f color = ComputeColor(scene, scene.cameras[cameraNo], hit, ray, scene.max_recursion_depth);
-                image[3 * j * width + 3 * i] = color.x;
-                image[3 * j * width + 3 * i + 1] = color.y;
-                image[3 * j * width + 3 * i + 2] = color.z;
+                image[3 * j * width + 3 * i] = color.x < 255 ? color.x : 255;
+                image[3 * j * width + 3 * i + 1] = color.y < 255 ? color.y : 255;
+                image[3 * j * width + 3 * i + 2] = color.z < 255 ? color.z : 255;
             }
         }
 
