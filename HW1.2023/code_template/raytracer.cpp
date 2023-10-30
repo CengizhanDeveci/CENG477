@@ -4,6 +4,7 @@
 #include "ppm.h"
 #include "ray.h"
 #include <limits>
+#include <thread>
 
 using namespace ray;
 
@@ -392,6 +393,22 @@ parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &cam
     return color;
 }
 
+void multiThread(parser::Scene scene, int cameraNo, unsigned char* &image, int height, int width, int start)
+{
+    for(int j = start; j < height; j+=4)
+    {
+        for(int i = 0; i < width; i++)
+        {   
+            Ray ray = GenerateRay(scene.cameras[cameraNo], i, j);
+            Hit hit = FindHit(scene, ray);
+            parser::Vec3f color = ComputeColor(scene, scene.cameras[cameraNo], hit, ray, scene.max_recursion_depth);
+            image[3 * j * width + 3 * i] = color.x < 255 ? color.x : 255;
+            image[3 * j * width + 3 * i + 1] = color.y < 255 ? color.y : 255;
+            image[3 * j * width + 3 * i + 2] = color.z < 255 ? color.z : 255;
+        }
+    }
+}
+
 int main(int argc, char* argv[])
 {
     // Sample usage for reading an XML scene file
@@ -406,19 +423,31 @@ int main(int argc, char* argv[])
         int width = scene.cameras[cameraNo].image_width;
         int height = scene.cameras[cameraNo].image_height;
         unsigned char* image = new unsigned char [width * height * 3];
+        std::thread t1(multiThread, scene, cameraNo, std::ref(image),height, width, 0);
+        std::thread t2(multiThread, scene, cameraNo, std::ref(image),height, width, 1);
+        std::thread t3(multiThread, scene, cameraNo, std::ref(image),height, width, 2);
+        std::thread t4(multiThread, scene, cameraNo, std::ref(image),height, width, 3);
 
-        for(int j = 0; j < height; j++)
-        {
-            for(int i = 0; i < width; i++)
-            {   
-                Ray ray = GenerateRay(scene.cameras[cameraNo], i, j);
-                Hit hit = FindHit(scene, ray);
-                parser::Vec3f color = ComputeColor(scene, scene.cameras[cameraNo], hit, ray, scene.max_recursion_depth);
-                image[3 * j * width + 3 * i] = color.x < 255 ? color.x : 255;
-                image[3 * j * width + 3 * i + 1] = color.y < 255 ? color.y : 255;
-                image[3 * j * width + 3 * i + 2] = color.z < 255 ? color.z : 255;
-            }
-        }
+        t1.join();
+        t2.join();
+        t3.join();
+        t4.join();
+
+        // int width = scene.cameras[cameraNo].image_width;
+        // int height = scene.cameras[cameraNo].image_height;
+        // unsigned char* image = new unsigned char [width * height * 3];
+        // for(int j = 0; j < height; j++)
+        // {
+        //     for(int i = 0; i < width; i++)
+        //     {   
+        //         Ray ray = GenerateRay(scene.cameras[cameraNo], i, j);
+        //         Hit hit = FindHit(scene, ray);
+        //         parser::Vec3f color = ComputeColor(scene, scene.cameras[cameraNo], hit, ray, scene.max_recursion_depth);
+        //         image[3 * j * width + 3 * i] = color.x < 255 ? color.x : 255;
+        //         image[3 * j * width + 3 * i + 1] = color.y < 255 ? color.y : 255;
+        //         image[3 * j * width + 3 * i + 2] = color.z < 255 ? color.z : 255;
+        //     }
+        // }
 
         write_ppm(scene.cameras[cameraNo].image_name.c_str(), image, width, height);
     }
