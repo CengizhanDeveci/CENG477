@@ -1,53 +1,49 @@
 #ifndef __BVH__
-#define __BFH__
+#define __BVH__
 
 #include "ray.h"
 #include "parser.h"
+#include <vector>
 
 using namespace ray;
 using namespace parser;
 
-struct Object
-{
-
-};
-
-struct BVHNode
-{
-    BoundingBox boundingBox;
-    BVHNode* left;
-    BVHNode* right;
-    Object* object;
-};
-
 class BoundingBox
 {
     public:
-        // variables
-        parser::Vec3f minCorner;
-        parser::Vec3f maxCorner;
-        parser::Vec3f center;
+        parser::Vec3f min;
+        parser::Vec3f max;
 
-        // methods
-        bool Intersect(const Ray& ray, Hit& hit) const;
+        BoundingBox()
+        {
+            min = parser::Vec3f();
+            max = parser::Vec3f();
+        }
 
-        // static methods
-        static BoundingBox CalculateBoundingBox(const Object& object);
+        bool Intersect(ray::Ray& ray, ray::Hit& hit);
 
 };
 
-class BoundingVolume
+
+
+struct BVHNode
+{
+    BVHNode* left;
+    BVHNode* right;
+    BoundingBox* boundingBox;
+    Object* object;
+};
+
+
+
+class BVH
 {
     public:
-        // methods
-        BVHNode* BuildBVH(std::vector<Object>& objects, int start, int end);
-        
-
-        // variables
-        BVHNode* parent;
+        BVHNode* root;
+        BVHNode* BuildBVH(std::vector<Object*>& objects, int start, int end, int depth);
+        BVH(std::vector<Object*>& objects);
+        bool Intersect(ray::Ray& ray, BVHNode* node, ray::Hit& hit);
 
 };
 
-int ChooseSplitAxis();
-bool CompareOnAxis(int splitAxis, const Object& obj1, const Object& obj2);
 #endif

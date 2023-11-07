@@ -5,10 +5,14 @@
 #include "ray.h"
 #include <limits>
 #include <thread>
+#include "bvh.h"
+#include "raytracer_helper.h"
 
 using namespace ray;
 
 typedef unsigned char RGB[3];
+
+std::vector<Object*> objects;
 
 parser::Vec3f FindIntersectionPoint(const Ray &ray, float t)
 {
@@ -20,10 +24,8 @@ parser::Vec3f FindIntersectionPoint(const Ray &ray, float t)
     return result;
 }
 
-Hit HitSphere(const Ray &ray, parser::Vec3f &center, float radius, int materialID, int objectID)
+bool HitSphere(const Ray &ray, parser::Vec3f &center, float radius, int materialID, int objectID, Hit& hit)
 {
-    Hit hit;
-
     float A = DotProduct(ray.direction, ray.direction);
 	float B = 2 * DotProduct(ray.direction, SubtractVec3f(ray.origin, center));
 	float C = DotProduct(SubtractVec3f(ray.origin, center), SubtractVec3f(ray.origin, center)) - radius * radius;
@@ -43,9 +45,15 @@ Hit HitSphere(const Ray &ray, parser::Vec3f &center, float radius, int materialI
 
 		hit.materialID = materialID;
 		hit.type = 0;
+
 		hit.objectID = objectID;
 
 		float t = (t1 > t2) ? t2 : t1;
+        if(t < 0)
+        {
+            hit.hit = false;
+            return false;
+        }
         hit.t = t;
 		hit.intersectionPoint = FindIntersectionPoint(ray, t);
 
@@ -53,10 +61,10 @@ Hit HitSphere(const Ray &ray, parser::Vec3f &center, float radius, int materialI
 		hit.normal.x /= radius;
 		hit.normal.y /= radius;
 		hit.normal.z /= radius;
-        hit.normal = NormalizeVec3f(hit.normal);
+        hit.normal = ray::NormalizeVec3f(hit.normal);
     }
 
-    return hit;
+    return hit.hit;
 }
 
 Hit HitTriangle(const Ray &ray, const parser::Scene &scene, parser::Triangle &triangle, int obj_id){
@@ -69,7 +77,7 @@ Hit HitTriangle(const Ray &ray, const parser::Scene &scene, parser::Triangle &tr
 
     parser::Vec3f normal;
     normal = CrossProduct(SubtractVec3f(c, b), SubtractVec3f(a, b));
-    normal = NormalizeVec3f(normal);
+    normal = ray::NormalizeVec3f(normal);
 
     // some calculations for barycentric coordinates
     float detA = Determinant(SubtractVec3f(a, b), SubtractVec3f(a, c), ray.direction);
@@ -89,7 +97,7 @@ Hit HitTriangle(const Ray &ray, const parser::Scene &scene, parser::Triangle &tr
 	hit.t = t;
 	hit.intersectionPoint = FindIntersectionPoint(ray, t);
 	hit.normal = CrossProduct(SubtractVec3f(b, a), SubtractVec3f(c, a));
-	hit.normal = NormalizeVec3f(hit.normal);
+	hit.normal = ray::NormalizeVec3f(hit.normal);
 
 	return hit;
 }
@@ -107,7 +115,7 @@ Hit HitMesh(const Ray &ray, const parser::Mesh &mesh, const parser::Scene &scene
 
         parser::Vec3f normal;
         normal = CrossProduct(SubtractVec3f(c, b), SubtractVec3f(a, b));
-        normal = NormalizeVec3f(normal);
+        normal = ray::NormalizeVec3f(normal);
 
         // some calculations for barycentric coordinates
         float detA = Determinant(SubtractVec3f(a, b), SubtractVec3f(a, c), ray.direction);
@@ -171,7 +179,7 @@ parser::Vec3f DiffuseShading(const parser::PointLight &pointLight, const parser:
     parser::Vec3f color;
     parser::Vec3f irradiance = FindIrradiance(pointLight, hit.intersectionPoint);
     parser::Vec3f wi = SubtractVec3f(pointLight.position, hit.intersectionPoint);
-    wi = NormalizeVec3f(wi);
+    wi = ray::NormalizeVec3f(wi);
 
     float cosThetaPrime = DotProduct(wi, hit.normal);
     if(cosThetaPrime <= 0) {color.x = 0; color.y=0; color.z=0;return color;}
@@ -189,10 +197,10 @@ parser::Vec3f SpecularShading(const parser::PointLight &pointLight, const parser
     parser::Vec3f irradiance = FindIrradiance(pointLight, hit.intersectionPoint);
 
     parser::Vec3f wi = SubtractVec3f(pointLight.position, hit.intersectionPoint);
-	wi = NormalizeVec3f(wi);
+	wi = ray::NormalizeVec3f(wi);
 
 	parser::Vec3f h = SubtractVec3f(wi, ray.direction);
-	h = NormalizeVec3f(h);
+	h = ray::NormalizeVec3f(h);
 
 	float cos_alpha_prime = DotProduct(hit.normal, h);
 	if(cos_alpha_prime <= 0) {color.x = 0; color.y=0; color.z=0;return color;}
@@ -218,8 +226,8 @@ Hit FindHit(const parser::Scene &scene, const Ray &ray)
         parser::Vec3f center = scene.vertex_data[currentSphere.center_vertex_id - 1];
         float radius = currentSphere.radius;
 
-        Hit hitCheck = HitSphere(ray, center, radius, currentSphere.material_id, sphereNumber);
-
+        //Hit hitCheck = HitSphere(ray, center, radius, currentSphere.material_id, sphereNumber);
+        Hit hitCheck;
         if(hitCheck.hit && hitCheck.t > 0 && hitCheck.t < hit.t)
         {
             hit.hit = true;
@@ -273,76 +281,86 @@ Hit FindHit(const parser::Scene &scene, const Ray &ray)
     return hit;
 }
 
-bool ShadowCheck(const parser::Scene &scene, Ray shadowRay, float t)
+bool ShadowCheck(const parser::Scene &scene, Ray shadowRay, float t, BVH& bvh)
 {
-    // loop for sphere hit
-    int spheresSize = scene.spheres.size();
-    for (int sphereNumber = 0; sphereNumber < spheresSize; sphereNumber++)
+    Hit hit;
+    hit.hit = bvh.Intersect(shadowRay, bvh.root, hit);
+    if(hit.hit && hit.t < t)
     {
-        parser::Sphere currentSphere = scene.spheres[sphereNumber];
-        parser::Vec3f center = scene.vertex_data[currentSphere.center_vertex_id - 1];
-        float radius = currentSphere.radius;
-
-        Hit hitCheck = HitSphere(shadowRay, center, radius, currentSphere.material_id, sphereNumber);
-        if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
-        {
-            return true;
-        }
+        return true;
     }
-    
-    // loop for triangle hit
-    int trianglesSize = scene.triangles.size();
-    for (int triangleNumber = 0; triangleNumber < trianglesSize; triangleNumber++)
-    {
-        parser::Triangle currentTriangle = scene.triangles[triangleNumber];
-        Hit hitCheck = HitTriangle(shadowRay, scene, currentTriangle, triangleNumber);
-
-        if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
-        {
-            return true;
-        }
-    }
-
-    // loop for meshes hit
-    int meshesSize = scene.meshes.size();
-    for (int meshNumber = 0; meshNumber < meshesSize; meshNumber++)
-    {
-        parser::Mesh currentMesh = scene.meshes[meshNumber];
-        Hit hitCheck = HitMesh(shadowRay, currentMesh, scene, meshNumber);
-
-        if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
-        {
-            return true;
-        }
-    }
-    
     return false;
+
+    // // loop for sphere hit
+    // int spheresSize = scene.spheres.size();
+    // for (int sphereNumber = 0; sphereNumber < spheresSize; sphereNumber++)
+    // {
+    //     parser::Sphere currentSphere = scene.spheres[sphereNumber];
+    //     parser::Vec3f center = scene.vertex_data[currentSphere.center_vertex_id - 1];
+    //     float radius = currentSphere.radius;
+
+    //     Hit hitCheck = HitSphere(shadowRay, center, radius, currentSphere.material_id, sphereNumber);
+    //     if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
+    //     {
+    //         return true;
+    //     }
+    // }
+    
+    // // loop for triangle hit
+    // int trianglesSize = scene.triangles.size();
+    // for (int triangleNumber = 0; triangleNumber < trianglesSize; triangleNumber++)
+    // {
+    //     parser::Triangle currentTriangle = scene.triangles[triangleNumber];
+    //     Hit hitCheck = HitTriangle(shadowRay, scene, currentTriangle, triangleNumber);
+
+    //     if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
+    //     {
+    //         return true;
+    //     }
+    // }
+
+    // // loop for meshes hit
+    // int meshesSize = scene.meshes.size();
+    // for (int meshNumber = 0; meshNumber < meshesSize; meshNumber++)
+    // {
+    //     parser::Mesh currentMesh = scene.meshes[meshNumber];
+    //     Hit hitCheck = HitMesh(shadowRay, currentMesh, scene, meshNumber);
+
+    //     if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
+    //     {
+    //         return true;
+    //     }
+    // }
+    
+    // return false;
 }
 
-parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &camera, const Hit &hit, const Ray &ray, int recursionCount)
+parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &camera, const Hit &hit, const Ray &ray, int recursionCount, BVH& bvh)
 {
     parser::Vec3f color;
     
     if(hit.hit)
     {
+        // std::cout << "here" << std::endl;
+        // std::cout << hit.t << std::endl;
+        if(hit.t < 0.0) std::cout << hit.t << std::endl;
         color = AmbientShading(scene, hit.materialID);
-
         for(int lightNumber = 0; lightNumber < scene.point_lights.size(); lightNumber++)
         {
-            parser::Vec3f wiEpsilon;
-            wiEpsilon.x = hit.normal.x * scene.shadow_ray_epsilon;
-            wiEpsilon.y = hit.normal.y * scene.shadow_ray_epsilon;
-            wiEpsilon.z = hit.normal.z * scene.shadow_ray_epsilon;
+            // parser::Vec3f wiEpsilon;
+            // wiEpsilon.x = hit.normal.x * scene.shadow_ray_epsilon;
+            // wiEpsilon.y = hit.normal.y * scene.shadow_ray_epsilon;
+            // wiEpsilon.z = hit.normal.z * scene.shadow_ray_epsilon;
 
-            Ray shadowRay;
-            shadowRay.origin = AddVec3f(wiEpsilon, hit.intersectionPoint);
-            parser::Vec3f tmp1 = hit.intersectionPoint;
-            parser::Vec3f tmp2 = scene.point_lights[lightNumber].position;
-            shadowRay.direction = SubtractVec3f(tmp2, tmp1);
-            shadowRay.direction = NormalizeVec3f(shadowRay.direction);
-            float tLight = (tmp2.x - shadowRay.origin.x) / shadowRay.direction.x;
-            bool isShadow = ShadowCheck(scene, shadowRay, tLight);
-
+            // Ray shadowRay;
+            // shadowRay.origin = AddVec3f(wiEpsilon, hit.intersectionPoint);
+            // parser::Vec3f tmp1 = hit.intersectionPoint;
+            // parser::Vec3f tmp2 = scene.point_lights[lightNumber].position;
+            // shadowRay.direction = SubtractVec3f(tmp2, tmp1);
+            // shadowRay.direction = ray::NormalizeVec3f(shadowRay.direction);
+            // float tLight = (tmp2.x - shadowRay.origin.x) / shadowRay.direction.x;
+            // bool isShadow = ShadowCheck(scene, shadowRay, tLight, bvh);
+            bool isShadow = false;
             if(!isShadow)
             {
                 parser::Vec3f diffuse = DiffuseShading(scene.point_lights[lightNumber], scene, hit);
@@ -354,35 +372,42 @@ parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &cam
             }
         }
 
-        if(scene.materials[hit.materialID - 1].is_mirror && recursionCount > 0)
-        {
-            parser::Vec3f mirrorColor;
+        // if(scene.materials[hit.materialID - 1].is_mirror && recursionCount > 0)
+        // {
+        //     parser::Vec3f mirrorColor;
 
-            float cosTheta = DotProduct(ray.direction, hit.normal);
-            parser::Vec3f wr;
-            wr.x = -2 * hit.normal.x * cosTheta + ray.direction.x;
-            wr.y = -2 * hit.normal.y * cosTheta + ray.direction.y;
-            wr.z = -2 * hit.normal.z * cosTheta + ray.direction.z;
-            wr = NormalizeVec3f(wr);
+        //     float cosTheta = DotProduct(ray.direction, hit.normal);
+        //     parser::Vec3f wr;
+        //     wr.x = -2 * hit.normal.x * cosTheta + ray.direction.x;
+        //     wr.y = -2 * hit.normal.y * cosTheta + ray.direction.y;
+        //     wr.z = -2 * hit.normal.z * cosTheta + ray.direction.z;
+        //     wr = ray::NormalizeVec3f(wr);
             
-            parser::Vec3f wiEpsilon;
-            wiEpsilon.x = wr.x * scene.shadow_ray_epsilon;
-            wiEpsilon.y = wr.y * scene.shadow_ray_epsilon;
-            wiEpsilon.z = wr.z * scene.shadow_ray_epsilon;
+        //     parser::Vec3f wiEpsilon;
+        //     wiEpsilon.x = wr.x * scene.shadow_ray_epsilon;
+        //     wiEpsilon.y = wr.y * scene.shadow_ray_epsilon;
+        //     wiEpsilon.z = wr.z * scene.shadow_ray_epsilon;
 
-            Ray reflectionRay;
-            reflectionRay.origin = AddVec3f(hit.intersectionPoint, wiEpsilon);
-            reflectionRay.direction = wr;
+        //     Ray reflectionRay;
+        //     reflectionRay.origin = AddVec3f(hit.intersectionPoint, wiEpsilon);
+        //     reflectionRay.direction = wr;
 
-            Hit newHit = FindHit(scene, reflectionRay);
-            if(!(newHit.type == hit.type && newHit.objectID == hit.objectID))
-            {
-                mirrorColor = ComputeColor(scene, camera, newHit, reflectionRay, recursionCount - 1);
-                color.x += mirrorColor.x * scene.materials[hit.materialID - 1].mirror.x;
-                color.y += mirrorColor.y * scene.materials[hit.materialID - 1].mirror.y;
-                color.z += mirrorColor.z * scene.materials[hit.materialID - 1].mirror.z;
-            }
-        }
+        //     //Hit newHit = FindHit(scene, reflectionRay);
+        //     Hit newHit;
+        //     newHit.hit = false;
+        //     bool hitHappenedMirror = bvh.Intersect(reflectionRay, bvh.root, newHit);
+        //     if(newHit.hit)
+        //     {
+        //         if(!(newHit.type == hit.type && newHit.objectID == hit.objectID))
+        //         {
+        //             mirrorColor = ComputeColor(scene, camera, newHit, reflectionRay, recursionCount - 1, bvh);
+        //             color.x += mirrorColor.x * scene.materials[hit.materialID - 1].mirror.x;
+        //             color.y += mirrorColor.y * scene.materials[hit.materialID - 1].mirror.y;
+        //             color.z += mirrorColor.z * scene.materials[hit.materialID - 1].mirror.z;
+        //         }
+        //     }
+            
+        // }
     }
     else
     {
@@ -393,15 +418,21 @@ parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &cam
     return color;
 }
 
-void multiThread(parser::Scene scene, int cameraNo, unsigned char* &image, int height, int width, int start)
+void multiThread(parser::Scene scene, int cameraNo, unsigned char* &image, int height, int width, int start, BVH& bvh)
 {
     for(int j = start; j < height; j+=4)
     {
         for(int i = 0; i < width; i++)
         {   
+            std::cout << i << " - " << j << std::endl;
             Ray ray = GenerateRay(scene.cameras[cameraNo], i, j);
-            Hit hit = FindHit(scene, ray);
-            parser::Vec3f color = ComputeColor(scene, scene.cameras[cameraNo], hit, ray, scene.max_recursion_depth);
+            //Hit hit = FindHit(scene, ray);
+            Hit hit;
+            hit.hit = false;
+            bool hitHappened = bvh.Intersect(ray, bvh.root, hit);
+            std::cout << "here" << std::endl;
+
+            parser::Vec3f color = ComputeColor(scene, scene.cameras[cameraNo], hit, ray, scene.max_recursion_depth, bvh);
             image[3 * j * width + 3 * i] = color.x < 255 ? color.x : 255;
             image[3 * j * width + 3 * i + 1] = color.y < 255 ? color.y : 255;
             image[3 * j * width + 3 * i + 2] = color.z < 255 ? color.z : 255;
@@ -416,38 +447,105 @@ int main(int argc, char* argv[])
 
     scene.loadFromXml(argv[1]);
 
+    for(parser::Triangle& triangle : scene.triangles)
+    {
+        triangle.indices.boundingBox = new BoundingBox();
+        triangle.indices.boundingBox->min.x = std::min(scene.vertex_data[triangle.indices.v0_id - 1].x, std::min(scene.vertex_data[triangle.indices.v1_id - 1].x, scene.vertex_data[triangle.indices.v2_id - 1].x));
+        triangle.indices.boundingBox->min.y = std::min(scene.vertex_data[triangle.indices.v0_id - 1].y, std::min(scene.vertex_data[triangle.indices.v1_id - 1].y, scene.vertex_data[triangle.indices.v2_id - 1].y));
+        triangle.indices.boundingBox->min.z = std::min(scene.vertex_data[triangle.indices.v0_id - 1].z, std::min(scene.vertex_data[triangle.indices.v1_id - 1].z, scene.vertex_data[triangle.indices.v2_id - 1].z));
+        triangle.indices.boundingBox->max.x = std::max(scene.vertex_data[triangle.indices.v0_id - 1].x, std::max(scene.vertex_data[triangle.indices.v1_id - 1].x, scene.vertex_data[triangle.indices.v2_id - 1].x));
+        triangle.indices.boundingBox->max.y = std::max(scene.vertex_data[triangle.indices.v0_id - 1].y, std::max(scene.vertex_data[triangle.indices.v1_id - 1].y, scene.vertex_data[triangle.indices.v2_id - 1].y));
+        triangle.indices.boundingBox->max.z = std::max(scene.vertex_data[triangle.indices.v0_id - 1].z, std::max(scene.vertex_data[triangle.indices.v1_id - 1].z, scene.vertex_data[triangle.indices.v2_id - 1].z));
+
+        parser::Vec3f a = scene.vertex_data[triangle.indices.v0_id - 1];
+        parser::Vec3f b = scene.vertex_data[triangle.indices.v1_id - 1];
+        parser::Vec3f c = scene.vertex_data[triangle.indices.v2_id - 1];
+
+        parser::Vec3f normal;
+        normal = CrossProduct(SubtractVec3f(c, b), SubtractVec3f(a, b));
+        normal = ray::NormalizeVec3f(normal);   
+        triangle.indices.normal = normal;
+        triangle.indices.material_id = triangle.material_id;
+        triangle.indices.isSphere = false;
+
+        objects.push_back(&triangle.indices);   
+    }
+    for (parser::Sphere& sphere : scene.spheres)
+    {
+        sphere.boundingBox = new BoundingBox();
+        sphere.boundingBox->min = SubtractVec3f(scene.vertex_data[sphere.center_vertex_id - 1], parser::Vec3f(sphere.radius, sphere.radius, sphere.radius));
+        sphere.boundingBox->max = AddVec3f(scene.vertex_data[sphere.center_vertex_id - 1], parser::Vec3f(sphere.radius, sphere.radius, sphere.radius));
+        sphere.normal = parser::Vec3f(0, 0, 0);
+        sphere.isSphere = true;
+
+        objects.push_back(&sphere);
+    }
+    for (parser::Mesh& mesh : scene.meshes)
+    {
+        for(parser::Face& face : mesh.faces)
+        {
+            face.boundingBox = new BoundingBox();
+            face.boundingBox->min.x = std::min(scene.vertex_data[face.v0_id - 1].x, std::min(scene.vertex_data[face.v1_id - 1].x, scene.vertex_data[face.v2_id - 1].x));
+            face.boundingBox->min.y = std::min(scene.vertex_data[face.v0_id - 1].y, std::min(scene.vertex_data[face.v1_id - 1].y, scene.vertex_data[face.v2_id - 1].y));
+            face.boundingBox->min.z = std::min(scene.vertex_data[face.v0_id - 1].z, std::min(scene.vertex_data[face.v1_id - 1].z, scene.vertex_data[face.v2_id - 1].z));
+            face.boundingBox->max.x = std::max(scene.vertex_data[face.v0_id - 1].x, std::max(scene.vertex_data[face.v1_id - 1].x, scene.vertex_data[face.v2_id - 1].x));
+            face.boundingBox->max.y = std::max(scene.vertex_data[face.v0_id - 1].y, std::max(scene.vertex_data[face.v1_id - 1].y, scene.vertex_data[face.v2_id - 1].y));
+            face.boundingBox->max.z = std::max(scene.vertex_data[face.v0_id - 1].z, std::max(scene.vertex_data[face.v1_id - 1].z, scene.vertex_data[face.v2_id - 1].z));
+
+            parser::Vec3f a = scene.vertex_data[face.v0_id - 1];
+            parser::Vec3f b = scene.vertex_data[face.v1_id - 1];
+            parser::Vec3f c = scene.vertex_data[face.v2_id - 1];
+
+            parser::Vec3f normal;
+            normal = CrossProduct(SubtractVec3f(c, b), SubtractVec3f(a, b));
+            normal = ray::NormalizeVec3f(normal);
+            face.normal = normal;
+            face.material_id = mesh.material_id;
+            face.isSphere = false;
+
+            objects.push_back(&face);
+        }
+    }
+    BVH bvh(objects);
+
     int numberOfCameras = scene.cameras.size();
 
     for(int cameraNo = 0; cameraNo < numberOfCameras; cameraNo++)
     {
+
         int width = scene.cameras[cameraNo].image_width;
         int height = scene.cameras[cameraNo].image_height;
         unsigned char* image = new unsigned char [width * height * 3];
-        std::thread t1(multiThread, scene, cameraNo, std::ref(image),height, width, 0);
-        std::thread t2(multiThread, scene, cameraNo, std::ref(image),height, width, 1);
-        std::thread t3(multiThread, scene, cameraNo, std::ref(image),height, width, 2);
-        std::thread t4(multiThread, scene, cameraNo, std::ref(image),height, width, 3);
+        // std::thread t1(multiThread, scene, cameraNo, std::ref(image),height, width, 0, std::ref(bvh));
+        // std::thread t2(multiThread, scene, cameraNo, std::ref(image),height, width, 1, std::ref(bvh));
+        // std::thread t3(multiThread, scene, cameraNo, std::ref(image),height, width, 2, std::ref(bvh));
+        // std::thread t4(multiThread, scene, cameraNo, std::ref(image),height, width, 3, std::ref(bvh));
 
-        t1.join();
-        t2.join();
-        t3.join();
-        t4.join();
+        // t1.join();
+        // t2.join();
+        // t3.join();
+        // t4.join();
 
-        // int width = scene.cameras[cameraNo].image_width;
-        // int height = scene.cameras[cameraNo].image_height;
-        // unsigned char* image = new unsigned char [width * height * 3];
-        // for(int j = 0; j < height; j++)
-        // {
-        //     for(int i = 0; i < width; i++)
-        //     {   
-        //         Ray ray = GenerateRay(scene.cameras[cameraNo], i, j);
-        //         Hit hit = FindHit(scene, ray);
-        //         parser::Vec3f color = ComputeColor(scene, scene.cameras[cameraNo], hit, ray, scene.max_recursion_depth);
-        //         image[3 * j * width + 3 * i] = color.x < 255 ? color.x : 255;
-        //         image[3 * j * width + 3 * i + 1] = color.y < 255 ? color.y : 255;
-        //         image[3 * j * width + 3 * i + 2] = color.z < 255 ? color.z : 255;
-        //     }
-        // }
+        for(int j = 0; j < height; j+=4)
+        {
+            for(int i = 0; i < width; i++)
+            {   
+                //std::cout << i << " - " << j << std::endl;
+                Ray ray = GenerateRay(scene.cameras[cameraNo], i, j);
+                //Hit hit = FindHit(scene, ray);
+                Hit hit;
+                hit.hit = false;
+                //std::cout << "here" << std::endl;
+                bool hitHappened = bvh.Intersect(ray, bvh.root, hit);
+                //std::cout << "here" << std::endl;
+
+
+                parser::Vec3f color = ComputeColor(scene, scene.cameras[cameraNo], hit, ray, scene.max_recursion_depth, bvh);
+                image[3 * j * width + 3 * i] = color.x < 255 ? color.x : 255;
+                image[3 * j * width + 3 * i + 1] = color.y < 255 ? color.y : 255;
+                image[3 * j * width + 3 * i + 2] = color.z < 255 ? color.z : 255;
+            }
+        }
 
         write_ppm(scene.cameras[cameraNo].image_name.c_str(), image, width, height);
     }

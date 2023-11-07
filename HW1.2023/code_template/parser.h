@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+class BoundingBox;
+
 namespace parser
 {
     //Notice that all the structures are as simple as possible
@@ -11,6 +13,21 @@ namespace parser
     struct Vec3f
     {
         float x, y, z;
+        Vec3f() : x(0), y(0), z(0) {}
+        Vec3f(float x, float y, float z) : x(x), y(y), z(z) {}
+    };
+
+    class Object
+    {
+        public:
+            BoundingBox* boundingBox;
+            int material_id;
+            Vec3f normal;
+            int object_id;
+            int type;
+            bool isSphere;
+            Vec3f center;
+            float radius;
     };
 
     struct Vec3i
@@ -50,7 +67,7 @@ namespace parser
         float phong_exponent;
     };
 
-    struct Face
+    struct Face : Object
     {
         int v0_id;
         int v1_id;
@@ -69,7 +86,7 @@ namespace parser
         Face indices;
     };
 
-    struct Sphere
+    struct Sphere : Object
     {
         int material_id;
         int center_vertex_id;
