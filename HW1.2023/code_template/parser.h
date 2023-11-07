@@ -28,6 +28,10 @@ namespace parser
             bool isSphere;
             Vec3f center;
             float radius;
+            float tmp;
+            int materialID;
+            int objectID;
+            Vec3f a, b, c;
     };
 
     struct Vec3i

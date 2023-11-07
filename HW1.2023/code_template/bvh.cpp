@@ -6,7 +6,7 @@
 #include <limits>
 #include "raytracer_helper.h"
 
-#define epsilon 10e-3
+#define epsilon 0.0
 
 using namespace parser;
 
@@ -81,19 +81,18 @@ bool BVH::Intersect(Ray &ray, BVHNode* node, Hit& hit)
             if(node->object->isSphere)
             {
                 hit.hit = false;
-                bool tmp = HitSphere(ray, node->object->center, node->object->radius, node->object->material_id, node->object->object_id, hit);
-                if(hit.hit) std::cout << hit.t << std::endl;
+                bool tmp = HitSphere(ray, node->object->center, node->object->tmp, node->object->materialID, node->object->objectID, hit);
             }
             else 
             {
-                bool checkHit = node->object->boundingBox->Intersect(ray, hit);
-                if(checkHit)
+                bool tmp = HitTriangle(ray, node->object->a, node->object->b, node->object->c, node->object->objectID, hit);
+                if(tmp)
                 {
                     hit.hit = true;
                     hit.intersectionPoint = AddVec3f(ray.origin, MultiplyVec3f(ray.direction, hit.t));
                     hit.materialID = node->object->material_id;
                     hit.normal = node->object->normal; // TODO calculate normal
-                    hit.objectID = node->object->object_id;
+                    hit.objectID = node->object->objectID;
                     hit.type = node->object->type;
                 }
                 else
