@@ -29,10 +29,7 @@ bool HitSphere(const Ray &ray, parser::Vec3f &center, float radius, int material
     float A = DotProduct(ray.direction, ray.direction);
 	float B = 2 * DotProduct(ray.direction, SubtractVec3f(ray.origin, center));
 	float C = DotProduct(SubtractVec3f(ray.origin, center), SubtractVec3f(ray.origin, center)) - radius * radius;
-    // std::cout << ray.direction.x << " - " << ray.direction.y << " - " << ray.direction.z << std::endl; 
-    // std::cout << ray.origin.x << " - " << ray.origin.y << " - " << ray.origin.z << std::endl; 
-    // std::cout << center.x << " - " << center.y << " - " << center.z << std::endl;
-    //std::cout << materialID << std::endl;
+
 	float delta = B * B - 4 * A * C;
 
     if(delta < 0) // no intersection
@@ -132,54 +129,6 @@ Hit HitTriangle(const Ray &ray, const parser::Scene &scene, parser::Triangle &tr
 	return hit;
 }
 
-Hit HitMesh(const Ray &ray, const parser::Mesh &mesh, const parser::Scene &scene, int obj_id){
-    float t_min = std::numeric_limits<float>::max();
-    Hit hit;
-    hit.hit = false;
-    for(int i = 0; i < mesh.faces.size(); i++){
-        // every mesh faces is an triangle therefore we will use same algorithm which we used in triangle intersection.
-        // we will get smallest positive t value.
-        parser::Vec3f a = scene.vertex_data[mesh.faces[i].v0_id - 1];
-        parser::Vec3f b = scene.vertex_data[mesh.faces[i].v1_id - 1];
-        parser::Vec3f c = scene.vertex_data[mesh.faces[i].v2_id - 1];
-
-        parser::Vec3f normal;
-        normal = CrossProduct(SubtractVec3f(c, b), SubtractVec3f(a, b));
-        normal = ray::NormalizeVec3f(normal);
-
-        // some calculations for barycentric coordinates
-        float detA = Determinant(SubtractVec3f(a, b), SubtractVec3f(a, c), ray.direction);
-        float beta = Determinant(SubtractVec3f(a, ray.origin), SubtractVec3f(a, c), ray.direction) / detA;
-        float gamma = Determinant(SubtractVec3f(a, b), SubtractVec3f(a, ray.origin), ray.direction) / detA;
-        float t = Determinant(SubtractVec3f(a, b), SubtractVec3f(a, c), SubtractVec3f(a, ray.origin)) / detA;
-
-        // if the values are negative it does not intersects
-        if(beta < 0 || beta > 1 - gamma) continue;
-        if(gamma < 0 || gamma > 1 - beta) continue;
-        // we cannot see the object
-        if(t < 0) continue;
-
-        if(t < t_min){
-            hit.hit = true;
-            
-            hit.materialID = mesh.material_id;
-            hit.normal = normal;
-            t_min = t;
-        }
-    }
-
-    if(hit.hit)
-    {
-        hit.t = t_min;
-        hit.intersectionPoint = FindIntersectionPoint(ray, t_min);
-    }
-
-    hit.objectID = obj_id;
-    hit.type = 2;
-
-    return hit;
-}
-
 parser::Vec3f FindIrradiance(const parser::PointLight &pointLight, const parser::Vec3f &intersectionPoint)
 {
     parser::Vec3f result;
@@ -242,75 +191,6 @@ parser::Vec3f SpecularShading(const parser::PointLight &pointLight, const parser
     return color;
 }
 
-Hit FindHit(const parser::Scene &scene, const Ray &ray)
-{
-    Hit hit;
-    hit.hit = false;
-    hit.t = std::numeric_limits<float>::max();
-
-    // loop for sphere hit
-    int spheresSize = scene.spheres.size();
-    for (int sphereNumber = 0; sphereNumber < spheresSize; sphereNumber++)
-    {
-        parser::Sphere currentSphere = scene.spheres[sphereNumber];
-        parser::Vec3f center = scene.vertex_data[currentSphere.center_vertex_id - 1];
-        float radius = currentSphere.radius;
-
-        //Hit hitCheck = HitSphere(ray, center, radius, currentSphere.material_id, sphereNumber);
-        Hit hitCheck;
-        if(hitCheck.hit && hitCheck.t > 0 && hitCheck.t < hit.t)
-        {
-            hit.hit = true;
-            hit.intersectionPoint = hitCheck.intersectionPoint;
-            hit.materialID = hitCheck.materialID;
-            hit.normal = hitCheck.normal;
-            hit.objectID = hitCheck.objectID;
-            hit.t = hitCheck.t;
-            hit.type = hitCheck.type;
-        }
-    }
-    
-    // loop for triangle hit
-    int trianglesSize = scene.triangles.size();
-    for (int triangleNumber = 0; triangleNumber < trianglesSize; triangleNumber++)
-    {
-        parser::Triangle currentTriangle = scene.triangles[triangleNumber];
-        Hit hitCheck = HitTriangle(ray, scene, currentTriangle, triangleNumber);
-
-        if(hitCheck.hit && hitCheck.t && hitCheck.t < hit.t)
-        {
-            hit.hit = true;
-            hit.intersectionPoint = hitCheck.intersectionPoint;
-            hit.materialID = hitCheck.materialID;
-            hit.normal = hitCheck.normal;
-            hit.objectID = hitCheck.objectID;
-            hit.t = hitCheck.t;
-            hit.type = hitCheck.type;
-        }
-    }
-
-    // loop for meshes hit
-    int meshesSize = scene.meshes.size();
-    for (int meshNumber = 0; meshNumber < meshesSize; meshNumber++)
-    {
-        parser::Mesh currentMesh = scene.meshes[meshNumber];
-        Hit hitCheck = HitMesh(ray, currentMesh, scene, meshNumber);
-        
-        if(hitCheck.hit && hitCheck.t && hitCheck.t < hit.t)
-        {
-            hit.hit = true;
-            hit.intersectionPoint = hitCheck.intersectionPoint;
-            hit.materialID = hitCheck.materialID;
-            hit.normal = hitCheck.normal;
-            hit.objectID = hitCheck.objectID;
-            hit.t = hitCheck.t;
-            hit.type = hitCheck.type;
-        }
-    }
-    
-    return hit;
-}
-
 bool ShadowCheck(const parser::Scene &scene, Ray shadowRay, float t, BVH& bvh)
 {
     Hit hit;
@@ -320,49 +200,6 @@ bool ShadowCheck(const parser::Scene &scene, Ray shadowRay, float t, BVH& bvh)
         return true;
     }
     return false;
-
-    // // loop for sphere hit
-    // int spheresSize = scene.spheres.size();
-    // for (int sphereNumber = 0; sphereNumber < spheresSize; sphereNumber++)
-    // {
-    //     parser::Sphere currentSphere = scene.spheres[sphereNumber];
-    //     parser::Vec3f center = scene.vertex_data[currentSphere.center_vertex_id - 1];
-    //     float radius = currentSphere.radius;
-
-    //     Hit hitCheck = HitSphere(shadowRay, center, radius, currentSphere.material_id, sphereNumber);
-    //     if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
-    //     {
-    //         return true;
-    //     }
-    // }
-    
-    // // loop for triangle hit
-    // int trianglesSize = scene.triangles.size();
-    // for (int triangleNumber = 0; triangleNumber < trianglesSize; triangleNumber++)
-    // {
-    //     parser::Triangle currentTriangle = scene.triangles[triangleNumber];
-    //     Hit hitCheck = HitTriangle(shadowRay, scene, currentTriangle, triangleNumber);
-
-    //     if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
-    //     {
-    //         return true;
-    //     }
-    // }
-
-    // // loop for meshes hit
-    // int meshesSize = scene.meshes.size();
-    // for (int meshNumber = 0; meshNumber < meshesSize; meshNumber++)
-    // {
-    //     parser::Mesh currentMesh = scene.meshes[meshNumber];
-    //     Hit hitCheck = HitMesh(shadowRay, currentMesh, scene, meshNumber);
-
-    //     if(hitCheck.hit && hitCheck.t < t && hitCheck.t > 0.0)
-    //     {
-    //         return true;
-    //     }
-    // }
-    
-    // return false;
 }
 
 parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &camera, const Hit &hit, const Ray &ray, int recursionCount, BVH& bvh)
@@ -371,8 +208,6 @@ parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &cam
     
     if(hit.hit)
     {
-        //std::cout << "here" << std::endl;
-        // std::cout << hit.t << std::endl;
         color = AmbientShading(scene, hit.materialID);
         for(int lightNumber = 0; lightNumber < scene.point_lights.size(); lightNumber++)
         {
@@ -421,19 +256,15 @@ parser::Vec3f ComputeColor(const parser::Scene &scene, const parser::Camera &cam
             reflectionRay.origin = AddVec3f(hit.intersectionPoint, wiEpsilon);
             reflectionRay.direction = wr;
 
-            //Hit newHit = FindHit(scene, reflectionRay);
             Hit newHit;
             newHit.hit = false;
             bool hitHappenedMirror = bvh.Intersect(reflectionRay, bvh.root, newHit);
             if(newHit.hit)
             {
-                if(!(newHit.type == hit.type && newHit.objectID == hit.objectID))
-                {
-                    mirrorColor = ComputeColor(scene, camera, newHit, reflectionRay, recursionCount - 1, bvh);
-                    color.x += mirrorColor.x * scene.materials[hit.materialID - 1].mirror.x;
-                    color.y += mirrorColor.y * scene.materials[hit.materialID - 1].mirror.y;
-                    color.z += mirrorColor.z * scene.materials[hit.materialID - 1].mirror.z;
-                }
+                mirrorColor = ComputeColor(scene, camera, newHit, reflectionRay, recursionCount - 1, bvh);
+                color.x += mirrorColor.x * scene.materials[hit.materialID - 1].mirror.x;
+                color.y += mirrorColor.y * scene.materials[hit.materialID - 1].mirror.y;
+                color.z += mirrorColor.z * scene.materials[hit.materialID - 1].mirror.z;
             }
             
         }
@@ -453,13 +284,10 @@ void multiThread(parser::Scene scene, int cameraNo, unsigned char* &image, int h
     {
         for(int i = 0; i < width; i++)
         {   
-            //std::cout << i << " - " << j << std::endl;
             Ray ray = GenerateRay(scene.cameras[cameraNo], i, j);
-            //Hit hit = FindHit(scene, ray);
             Hit hit;
             hit.hit = false;
             bool hitHappened = bvh.Intersect(ray, bvh.root, hit);
-            //std::cout << "here2" << std::endl;
 
             parser::Vec3f color = ComputeColor(scene, scene.cameras[cameraNo], hit, ray, scene.max_recursion_depth, bvh);
             image[3 * j * width + 3 * i] = color.x < 255 ? color.x : 255;
@@ -556,26 +384,6 @@ int main(int argc, char* argv[])
         t2.join();
         t3.join();
         t4.join();
-
-        // for(int j = 0; j < height; j++)
-        // {
-        //     for(int i = 0; i < width; i++)
-        //     {   
-        //         //std::cout << i << " - " << j << std::endl;
-        //         Ray ray = GenerateRay(scene.cameras[cameraNo], i, j);
-        //         //Hit hit = FindHit(scene, ray);
-        //         Hit hit;
-        //         hit.hit = false;
-        //         //std::cout << "here" << std::endl;
-        //         bool hitHappened = bvh.Intersect(ray, bvh.root, hit);
-
-
-        //         parser::Vec3f color = ComputeColor(scene, scene.cameras[cameraNo], hit, ray, scene.max_recursion_depth, bvh);
-        //         image[3 * j * width + 3 * i] = color.x < 255 ? color.x : 255;
-        //         image[3 * j * width + 3 * i + 1] = color.y < 255 ? color.y : 255;
-        //         image[3 * j * width + 3 * i + 2] = color.z < 255 ? color.z : 255;
-        //     }
-        // }
 
         write_ppm(scene.cameras[cameraNo].image_name.c_str(), image, width, height);
     }
