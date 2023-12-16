@@ -8,6 +8,7 @@
 #include "Translation.h"
 #include "Rotation.h"
 #include "Scaling.h"
+#include "Camera.h"
 
 /*
  * Calculate cross product of vec3 a, vec3 b and return resulting vec3.
@@ -85,6 +86,23 @@ Matrix4 getTranslationMatrix(Translation t);
 */
 Matrix4 getRotationMatrix(Rotation r);
 
+/* 
+ * It takes the amount of scaling and returns scaling matrix.
+ */
 Matrix4 getScalingMatrix(Scaling s);
+
+Matrix4 getCameraTransformMatrix(Vec3 center, Vec3 u, Vec3 v, Vec3 w);
+
+Matrix4 getOrthographicProjectionMatrix(Camera* camera);
+
+Matrix4 getPersp2o(Camera* camera);
+
+Matrix4 getPerspectiveTransformationMatrix(Camera* camera);
+
+Vec3 perspectiveDivide(Vec4 point);
+
+Vec3 findNormal(Vec3 a, Vec3 b, Vec3 c);
+
+Matrix4 getViewPortTransformation(double nx, double ny);
 
 #endif
