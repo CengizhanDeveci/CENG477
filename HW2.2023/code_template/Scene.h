@@ -45,6 +45,7 @@ public:
 	float f20(int x, int y, int x2, int y2, int x0, int y0);
 	void triangleRasterization(Vec3 p0, Vec3 p1, Vec3 p2, Color c0, Color c1, Color c2, Camera* camera);
 	void draw(int x, int y, double z, Color c);
+	void drawWireframe(int x, int y, Color c);
 	void drawMeshes(Camera* camera, Matrix4 viewPortMatrix);
 	void clearTransformed();
 	std::vector<Vec3> clipping(Vec3& point1, Vec3& point2, bool& visible);

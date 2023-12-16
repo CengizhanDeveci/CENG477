@@ -347,7 +347,7 @@ void Scene::convertPPMToPNG(string ppmFileName)
 	// command = "./magick convert " + ppmFileName + " " + ppmFileName + ".png";
 	// system(command.c_str());
 	
-	command = "magick convert " + ppmFileName + " " + ppmFileName + ".png";
+	command = "convert " + ppmFileName + " " + ppmFileName + ".png";
 	system(command.c_str());
 }
 
@@ -474,9 +474,11 @@ bool Scene::backfaceCulling(Vec3 inverseW, Triangle triangle, int meshNumber, Ma
 	c = perspectiveDivide(c4);
 
 	Vec3 n = findNormal(a, b, c);
-	
+	n = normalizeVec3(n);
+	inverseW = normalizeVec3(inverseW);
 	double dot = dotProductVec3(inverseW, n);
-	return (dot > 0);
+
+	return (dot > -10e-3);
 }
 
 void Scene::draw(int x, int y, double z, Color c) 
@@ -486,6 +488,11 @@ void Scene::draw(int x, int y, double z, Color c)
 		this->depth[x][y] = z;
 		this->image[x][y] = c;
 	}
+}
+
+void Scene::drawWireframe(int x, int y, Color c)
+{
+	this->image[x][y] = c;
 }
 
 void Scene::midpointWithInterpolation(Vec3 p0, Vec3 p1, Color c0, Color c1, Camera* camera)
@@ -536,7 +543,7 @@ void Scene::midpointWithInterpolation(Vec3 p0, Vec3 p1, Color c0, Color c1, Came
 			c.g = makeBetweenZeroAnd255(round(c.g));
 			c.b = makeBetweenZeroAnd255(round(c.b));
 
-			draw(x, y, z0, c);
+			drawWireframe(x, y, c);
 			z0 += dz;
 
 			if(d < 0)
@@ -591,7 +598,7 @@ void Scene::midpointWithInterpolation(Vec3 p0, Vec3 p1, Color c0, Color c1, Came
 			c.g = makeBetweenZeroAnd255(round(c.g));
 			c.b = makeBetweenZeroAnd255(round(c.b));
 
-			draw(x, y, z0, c);
+			drawWireframe(x, y, c);
 
 			if(d < 0)
 			{
@@ -646,7 +653,7 @@ void Scene::midpointWithInterpolation(Vec3 p0, Vec3 p1, Color c0, Color c1, Came
 			c.g = makeBetweenZeroAnd255(round(c.g));
 			c.b = makeBetweenZeroAnd255(round(c.b));
 
-			draw(x, y, z0, c);
+			drawWireframe(x, y, c);
 			if(d < 0)
 			{
 				y -= 1;
@@ -700,9 +707,7 @@ void Scene::midpointWithInterpolation(Vec3 p0, Vec3 p1, Color c0, Color c1, Came
 			c.g = makeBetweenZeroAnd255(round(c.g));
 			c.b = makeBetweenZeroAnd255(round(c.b));
 
-
-
-			draw(x, y, z0, c);
+			drawWireframe(x, y, c);
 
 			if(d < 0)
 			{
