@@ -8,6 +8,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <random>
 #include <GL/glew.h>   // The GL Header File
 #include <GL/gl.h>   // The GL Header File
 #include <GLFW/glfw3.h> // The GLFW header
@@ -23,12 +24,16 @@
 
 using namespace std;
 
-GLuint gProgram[3];
+GLuint gProgram[4];
 GLint gIntensityLoc;
 float gIntensity = 1000;
 int gWidth = 800, gHeight = 800;
 int score = 0;
 float speed = 1.0f;
+
+bool objects[3];
+
+float xPosition = 0.0f;
 
 struct Vertex
 {
@@ -72,6 +77,12 @@ vector<Face> gFaces;
 GLuint gVertexAttribBuffer, gTextVBO, gIndexBuffer;
 GLint gInVertexLoc, gInNormalLoc;
 int gVertexDataSizeInBytes, gNormalDataSizeInBytes;
+int gVertexDataByIndex[4];
+int gNormalDataByIndex[4];
+int faceSize[3];
+
+bool getHit = false;
+
 
 /// Holds all state information relevant to a character as loaded using FreeType
 struct Character {
@@ -83,10 +94,16 @@ struct Character {
 
 std::map<GLchar, Character> Characters;
 
+void randomize()
+{
+    int randomNo = rand() % 3;
+
+}
 
 bool ParseObj(const string& fileName)
 {
     fstream myfile;
+    static int i = 1;
 
     // Open the input 
     myfile.open(fileName.c_str(), std::ios::in);
@@ -94,6 +111,11 @@ bool ParseObj(const string& fileName)
     if (myfile.is_open())
     {
         string curLine;
+        gVertexDataByIndex[i] = gVertexDataByIndex[i - 1];
+        gNormalDataByIndex[i] = gNormalDataByIndex[i - 1];
+
+        faceSize[i - 1] = 0;
+
 
         while (getline(myfile, curLine))
         {
@@ -121,12 +143,14 @@ bool ParseObj(const string& fileName)
                         str >> tmp; // consume "vn"
                         str >> c1 >> c2 >> c3;
                         gNormals.push_back(Normal(c1, c2, c3));
+                        gNormalDataByIndex[i] += 3 * sizeof(GLfloat);
                     }
                     else // vertex
                     {
                         str >> tmp; // consume "v"
                         str >> c1 >> c2 >> c3;
                         gVertices.push_back(Vertex(c1, c2, c3));
+                        gVertexDataByIndex[i] += 3 * sizeof(GLfloat);
                     }
                 }
                 else if (curLine[0] == 'f') // face
@@ -152,7 +176,8 @@ bool ParseObj(const string& fileName)
 						nIndex[c] -= 1;
 						tIndex[c] -= 1;
 					}
-
+                    
+                    faceSize[i - 1]++;
                     gFaces.push_back(Face(vIndex, tIndex, nIndex));
                 }
                 else
@@ -167,6 +192,8 @@ bool ParseObj(const string& fileName)
                 //data += "\n";
             }
         }
+        
+        i++;
 
         myfile.close();
     }
@@ -174,45 +201,6 @@ bool ParseObj(const string& fileName)
     {
         return false;
     }
-
-	/*
-	for (int i = 0; i < gVertices.size(); ++i)
-	{
-		Vector3 n;
-
-		for (int j = 0; j < gFaces.size(); ++j)
-		{
-			for (int k = 0; k < 3; ++k)
-			{
-				if (gFaces[j].vIndex[k] == i)
-				{
-					// face j contains vertex i
-					Vector3 a(gVertices[gFaces[j].vIndex[0]].x, 
-							  gVertices[gFaces[j].vIndex[0]].y,
-							  gVertices[gFaces[j].vIndex[0]].z);
-
-					Vector3 b(gVertices[gFaces[j].vIndex[1]].x, 
-							  gVertices[gFaces[j].vIndex[1]].y,
-							  gVertices[gFaces[j].vIndex[1]].z);
-
-					Vector3 c(gVertices[gFaces[j].vIndex[2]].x, 
-							  gVertices[gFaces[j].vIndex[2]].y,
-							  gVertices[gFaces[j].vIndex[2]].z);
-
-					Vector3 ab = b - a;
-					Vector3 ac = c - a;
-					Vector3 normalFromThisFace = (ab.cross(ac)).getNormalized();
-					n += normalFromThisFace;
-				}
-
-			}
-		}
-
-		n.normalize();
-
-		gNormals.push_back(Normal(n.x, n.y, n.z));
-	}
-	*/
 
 	assert(gVertices.size() == gNormals.size());
 
@@ -304,6 +292,7 @@ void initShaders()
     gProgram[0] = glCreateProgram();
     gProgram[1] = glCreateProgram();
     gProgram[2] = glCreateProgram();
+    gProgram[3] = glCreateProgram();
 
     createVS(gProgram[0], "vert0.glsl");
     createFS(gProgram[0], "frag0.glsl");
@@ -311,11 +300,16 @@ void initShaders()
     createVS(gProgram[1], "vert1.glsl");
     createFS(gProgram[1], "frag1.glsl");
 
-    createVS(gProgram[2], "vert_text.glsl");
-    createFS(gProgram[2], "frag_text.glsl");
+    createVS(gProgram[2], "vert2.glsl");
+    createFS(gProgram[2], "frag2.glsl");
+
+    createVS(gProgram[3], "vert_text.glsl");
+    createFS(gProgram[3], "frag_text.glsl");
 
     glBindAttribLocation(gProgram[0], 0, "inVertex");
     glBindAttribLocation(gProgram[0], 1, "inNormal");
+    glBindAttribLocation(gProgram[1], 0, "inVertex");
+    glBindAttribLocation(gProgram[1], 1, "inNormal");
     glBindAttribLocation(gProgram[1], 0, "inVertex");
     glBindAttribLocation(gProgram[1], 1, "inNormal");
     glBindAttribLocation(gProgram[2], 2, "vertex");
@@ -323,6 +317,7 @@ void initShaders()
     glLinkProgram(gProgram[0]);
     glLinkProgram(gProgram[1]);
     glLinkProgram(gProgram[2]);
+    glLinkProgram(gProgram[3]);
     glUseProgram(gProgram[0]);
 
     gIntensityLoc = glGetUniformLocation(gProgram[0], "intensity");
@@ -382,7 +377,6 @@ void initVBO()
         indexData[3*i+2] = gFaces[i].vIndex[2];
     }
 
-    cout << gVertexDataSizeInBytes << " " << gNormalDataSizeInBytes << " " << indexDataSizeInBytes << endl;
     glBufferData(GL_ARRAY_BUFFER, gVertexDataSizeInBytes + gNormalDataSizeInBytes, 0, GL_STATIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, gVertexDataSizeInBytes, vertexData);
     glBufferSubData(GL_ARRAY_BUFFER, gVertexDataSizeInBytes, gNormalDataSizeInBytes, normalData);
@@ -489,10 +483,17 @@ void initFonts(int windowWidth, int windowHeight)
 
 void init() 
 {
-	//ParseObj("armadillo.obj");
-	ParseObj("bunny.obj");
+    gVertexDataByIndex[0] = 0;
+    gNormalDataByIndex[0] = 0;
+    
+    //
 
-    //ParseObj("cube.obj");
+    ParseObj("quad.obj");
+
+    ParseObj("bunny.obj");
+
+    ParseObj("cube.obj");
+
 
     glEnable(GL_DEPTH_TEST);
     initShaders();
@@ -500,22 +501,22 @@ void init()
     initVBO();
 }
 
-void drawModel()
+void drawModel(int i = 0)
 {
 	glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataByIndex[i]));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes + gNormalDataByIndex[i]));
 
-	glDrawElements(GL_TRIANGLES, gFaces.size() * 3, GL_UNSIGNED_INT, 0);
+	glDrawElements(GL_TRIANGLES, faceSize[i] * 3, GL_UNSIGNED_INT, 0);
 }
 
 void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
 {
     float static height = y;
     // Activate corresponding render state	
-    glUseProgram(gProgram[2]);
+    glUseProgram(gProgram[3]);
     glUniform3f(glGetUniformLocation(gProgram[2], "textColor"), color.x, color.y, color.z);
     glActiveTexture(GL_TEXTURE0);
 
@@ -570,47 +571,121 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 	static float jumpY = 0;
+    static float offset = -9.0f;
+    static float length = 0.0f;
+    static float rotate = 0.0f;
 
-    glUseProgram(gProgram[0]);
-	//glLoadIdentity();
-	//glTranslatef(-2, 0, -10);
-	//glRotatef(angle, 0, 1, 0);
 
-    glm::mat4 T = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f - 5.0f + jumpY, -10.f));
-    glm::mat4 R = glm::rotate(glm::mat4(1.f), glm::radians(-90.0f), glm::vec3(0, 1, 0));
-    glm::mat4 modelMat = T * R;
+    // quad
+
+    glUseProgram(gProgram[1]);
+    glLoadIdentity();
+
+    glm::mat4 T = glm::translate(glm::mat4(1.f), glm::vec3(0.f, -8.f, -11.f + offset));
+    glm::mat4 R = glm::rotate(glm::mat4(1.f), glm::radians(90.0f), glm::vec3(1, 0, 0));
+    glm::mat4 S = glm::scale(glm::mat4(1.f), glm::vec3(20.f, 20.f, 1000.0f));
+    glm::mat4 modelMat = T * S * R;
     glm::mat4 modelMatInv = glm::transpose(glm::inverse(modelMat));
     glm::mat4 perspMat = glm::perspective(glm::radians(90.0f), 1.f, 0.1f, 200.0f);
 
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
-
-    drawModel();
-
-    glUseProgram(gProgram[1]);
-	//glLoadIdentity();
-	//glTranslatef(2, 0, -10);
-	//glRotatef(-angle, 0, 1, 0);
-
-    T = glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, -10.f));
-    modelMat = T;
-    modelMatInv = glm::transpose(glm::inverse(modelMat));
+    GLuint offsetLocation = glGetUniformLocation(gProgram[1], "offset");
+    glUniform1f(offsetLocation, offset);
 
     glUniformMatrix4fv(glGetUniformLocation(gProgram[1], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[1], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[1], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
 
-    drawModel();
+    drawModel(0);
+
+    assert(glGetError() == GL_NO_ERROR);
+
+    // bunny
+
+    glUseProgram(gProgram[0]);
+    glLoadIdentity();
+
+    T = glm::translate(glm::mat4(1.f), glm::vec3(xPosition, 0.f - 5.0f + jumpY, -10.f));
+    R = glm::rotate(glm::mat4(1.f), glm::radians(-90.0f + rotate), glm::vec3(0, 1, 0));
+    modelMat = T * R;
+    modelMatInv = glm::transpose(glm::inverse(modelMat));
+    perspMat = glm::perspective(glm::radians(90.0f), 1.f, 0.1f, 200.0f);
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
+
+    drawModel(1);
+
+
+    //cubes
+
+    glUseProgram(gProgram[2]);
+    glLoadIdentity();
+
+    T = glm::translate(glm::mat4(1.f), glm::vec3(-6.5f, -2.f, -100.f + length));
+    S = glm::scale(glm::mat4(1.f), glm::vec3(1.5f, 1.5f, 1.0f));
+    modelMat = T * S;
+    modelMatInv = glm::transpose(glm::inverse(modelMat));
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
+    
+
+    drawModel(2);
+
+    glUseProgram(gProgram[2]);
+    glLoadIdentity();
+
+    T = glm::translate(glm::mat4(1.f), glm::vec3(0.f, -2.f, -100.f + length));
+    S = glm::scale(glm::mat4(1.f), glm::vec3(1.5f, 1.5f, 1.0f));
+    modelMat = T * S;
+    modelMatInv = glm::transpose(glm::inverse(modelMat));
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
+
+    drawModel(2);
+
+    glUseProgram(gProgram[2]);
+    glLoadIdentity();
+
+    T = glm::translate(glm::mat4(1.f), glm::vec3(6.5f, -2.f, -100.f + length));
+    S = glm::scale(glm::mat4(1.f), glm::vec3(1.5f, 1.5f, 1.0f));
+    modelMat = T * S;
+    modelMatInv = glm::transpose(glm::inverse(modelMat));
+
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
+
+    drawModel(2);
+
     assert(glGetError() == GL_NO_ERROR);
 
     renderText("Score: " + to_string(score), 0, gHeight - 50, 1, glm::vec3(0, 1, 1));
 
     assert(glGetError() == GL_NO_ERROR);
 
-    float time = glfwGetTime() * speed; // Assuming you use GLFW for time
-    jumpY = 2.5f * sin(time * 2.0f); // Adjust the frequency to control the jump speed
+    float time = glfwGetTime() * speed * 5.0f; // Assuming you use GLFW for time
+    jumpY = 1.5f * sin(time * 2.0f); // Adjust the frequency to control the jump speed
+    offset += speed / 10;
+    offset = offset > 11.0f ? -9.0f : offset;
+    speed += 0.001;
 
+    length += 0.5f;
+    length = length > 100.f ? 0.f : length;
+
+    if(getHit)
+    {
+        rotate += 1.f * speed;
+        if(rotate > 360.f)
+        {
+            rotate = 0.f;
+            getHit = false;
+        }
+    }
 }
 
 void reshape(GLFWwindow* window, int w, int h)
@@ -624,21 +699,51 @@ void reshape(GLFWwindow* window, int w, int h)
     glViewport(0, 0, w, h);
 }
 
+
+
+void restart()
+{
+    getHit = false;
+}
+
 void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
+    
+    if (key == GLFW_KEY_R && action == GLFW_PRESS) // RESTART
+    {
+        restart();
+        getHit = true;
+    }
+
+    if (key == GLFW_KEY_A && ((action == GLFW_REPEAT) || (action == GLFW_PRESS))) // LEFT
+    {
+        
+        xPosition -= 0.5f;
+        xPosition = xPosition < -9.5f ? -9.5f : xPosition;
+    }
+
+    if (key == GLFW_KEY_D && ((action == GLFW_REPEAT) || (action == GLFW_PRESS)))// RIGHT
+    {
+        xPosition += 0.5f;
+        xPosition = xPosition > 9.5f ? 9.5f : xPosition;
+    }
 }
+
 
 void mainLoop(GLFWwindow* window)
 {
+
     while (!glfwWindowShouldClose(window))
     {
+        glfwWaitEventsTimeout(0.007);
+        //glfwPollEvents();
         display();
         glfwSwapBuffers(window);
-        glfwPollEvents();
+
     }
 }
 

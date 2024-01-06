@@ -1,29 +1,47 @@
-#version 120
+#version 330 core
 
-vec3 lightPos = vec3(5, 5, 5);
-vec3 eyePos = vec3(0, 0, 0);
+in vec4 fragPos;
+in vec3 N;
+in vec3 FragVertex;
 
-vec3 I = vec3(2, 2, 2);
+uniform vec3 lightPos;
+uniform vec3 eyePos;
+
+uniform float offset;
+
+out vec4 fragColor;
+
 vec3 Iamb = vec3(0.8, 0.8, 0.8);
 
-vec3 kd = vec3(0.2, 0, 0.7);
-vec3 ka = vec3(0.1, 0.1, 0.1);
-vec3 ks = vec3(0.8, 0.8, 0.8);
-
-varying vec4 fragPos;
-varying vec3 N;
+vec3 kaWhite = vec3(1, 1, 1);
+vec3 kaBlue = vec3(0.27, 0.51, 0.7);
 
 void main(void)
 {
-	vec3 L = normalize(lightPos - vec3(fragPos));
-	vec3 V = normalize(eyePos - vec3(fragPos));
-	vec3 H = normalize(L + V);
-	float NdotL = dot(N, L);
-	float NdotH = dot(N, H);
+    // Apply the boolean logic from your provided code
 
-	vec3 diffuseColor = I * kd * max(0, NdotL);
-	vec3 ambientColor = Iamb * ka;
-	vec3 specularColor = I * ks * pow(max(0, NdotH), 20);
+	bool x = (FragVertex.x > 0.5) || ((FragVertex.x < 0.0) && (FragVertex.x) > -0.5) ;
 
-    gl_FragColor = vec4(diffuseColor + ambientColor + specularColor, 1);
+	float tempY = FragVertex.y * 100.0 - 6.0;
+	while(tempY < -2.0)
+	{
+		tempY = tempY + 2.0;
+	}
+	bool y = (tempY) > -1.0;
+	
+
+    bool xorXY = x == y;
+
+    // Use the boolean logic to determine the color
+    vec3 ambientColor;
+    if (xorXY) 
+	{
+        ambientColor = kaWhite * Iamb;
+    } 
+	else 
+	{
+        ambientColor = kaBlue * Iamb;
+    }
+
+    fragColor = vec4(ambientColor, 1.0);
 }
