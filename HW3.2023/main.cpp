@@ -82,7 +82,8 @@ int gNormalDataByIndex[4];
 int faceSize[3];
 
 bool getHit = false;
-
+int moveSide = 0;
+bool end = false;
 
 /// Holds all state information relevant to a character as loaded using FreeType
 struct Character {
@@ -97,7 +98,24 @@ std::map<GLchar, Character> Characters;
 void randomize()
 {
     int randomNo = rand() % 3;
-
+    if(randomNo == 0)
+    {
+        objects[0] = true;
+        objects[1] = false;
+        objects[2] = false;
+    }
+    else if(randomNo == 1)
+    {
+        objects[0] = false;
+        objects[1] = true;
+        objects[2] = false;
+    }
+    else if(randomNo == 2)
+    {
+        objects[0] = false;
+        objects[1] = false;
+        objects[2] = true;
+    }
 }
 
 bool ParseObj(const string& fileName)
@@ -310,9 +328,9 @@ void initShaders()
     glBindAttribLocation(gProgram[0], 1, "inNormal");
     glBindAttribLocation(gProgram[1], 0, "inVertex");
     glBindAttribLocation(gProgram[1], 1, "inNormal");
-    glBindAttribLocation(gProgram[1], 0, "inVertex");
-    glBindAttribLocation(gProgram[1], 1, "inNormal");
-    glBindAttribLocation(gProgram[2], 2, "vertex");
+    glBindAttribLocation(gProgram[2], 0, "inVertex");
+    glBindAttribLocation(gProgram[2], 1, "inNormal");
+    glBindAttribLocation(gProgram[3], 2, "vertex");
 
     glLinkProgram(gProgram[0]);
     glLinkProgram(gProgram[1]);
@@ -400,8 +418,8 @@ void initFonts(int windowWidth, int windowHeight)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(windowWidth), 0.0f, static_cast<GLfloat>(windowHeight));
-    glUseProgram(gProgram[2]);
-    glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUseProgram(gProgram[3]);
+    glUniformMatrix4fv(glGetUniformLocation(gProgram[3], "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
     // FreeType
     FT_Library ft;
@@ -509,7 +527,15 @@ void drawModel(int i = 0)
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataByIndex[i]));
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes + gNormalDataByIndex[i]));
 
-	glDrawElements(GL_TRIANGLES, faceSize[i] * 3, GL_UNSIGNED_INT, 0);
+	//glDrawElements(GL_TRIANGLES, faceSize[i] * 3, GL_UNSIGNED_INT, 0);
+    if(i == 2)
+    {
+        glDrawElements(GL_TRIANGLES, gFaces.size() * 3, GL_UNSIGNED_INT, 0); // i dont know why but it works
+    }
+    else
+    {
+        glDrawElements(GL_TRIANGLES, faceSize[i] * 3, GL_UNSIGNED_INT, 0);
+    }
 }
 
 void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
@@ -517,7 +543,7 @@ void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, gl
     float static height = y;
     // Activate corresponding render state	
     glUseProgram(gProgram[3]);
-    glUniform3f(glGetUniformLocation(gProgram[2], "textColor"), color.x, color.y, color.z);
+    glUniform3f(glGetUniformLocation(gProgram[3], "textColor"), color.x, color.y, color.z);
     glActiveTexture(GL_TEXTURE0);
 
     // Iterate through all characters
@@ -572,7 +598,7 @@ void display()
 
 	static float jumpY = 0;
     static float offset = -9.0f;
-    static float length = 0.0f;
+    static float length = -100.0f;
     static float rotate = 0.0f;
 
 
@@ -615,15 +641,14 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
 
     drawModel(1);
-
-
+    
     //cubes
 
     glUseProgram(gProgram[2]);
     glLoadIdentity();
 
-    T = glm::translate(glm::mat4(1.f), glm::vec3(-6.5f, -2.f, -100.f + length));
-    S = glm::scale(glm::mat4(1.f), glm::vec3(1.5f, 1.5f, 1.0f));
+    T = glm::translate(glm::mat4(1.f), glm::vec3(-6.5f, -2.f, length));
+    S = glm::scale(glm::mat4(1.f), glm::vec3(1.f, 1.5f, 1.0f));
     modelMat = T * S;
     modelMatInv = glm::transpose(glm::inverse(modelMat));
 
@@ -631,14 +656,23 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
     
+    GLuint collectable = glGetUniformLocation(gProgram[2], "collectable");
+    float temp;
+
+    if(objects[0])
+        temp = 0.0f;
+    else
+        temp = 1.0f;
+
+    glUniform1f(collectable, temp);
 
     drawModel(2);
 
     glUseProgram(gProgram[2]);
     glLoadIdentity();
 
-    T = glm::translate(glm::mat4(1.f), glm::vec3(0.f, -2.f, -100.f + length));
-    S = glm::scale(glm::mat4(1.f), glm::vec3(1.5f, 1.5f, 1.0f));
+    T = glm::translate(glm::mat4(1.f), glm::vec3(0.f, -2.f, length));
+    S = glm::scale(glm::mat4(1.f), glm::vec3(1.f, 1.5f, 1.0f));
     modelMat = T * S;
     modelMatInv = glm::transpose(glm::inverse(modelMat));
 
@@ -646,19 +680,36 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
 
+    collectable = glGetUniformLocation(gProgram[2], "collectable");
+    if(objects[1])
+        temp = 0.0f;
+    else
+        temp = 1.0f;
+
+    glUniform1f(collectable, temp);
+
     drawModel(2);
 
     glUseProgram(gProgram[2]);
     glLoadIdentity();
 
-    T = glm::translate(glm::mat4(1.f), glm::vec3(6.5f, -2.f, -100.f + length));
-    S = glm::scale(glm::mat4(1.f), glm::vec3(1.5f, 1.5f, 1.0f));
+    T = glm::translate(glm::mat4(1.f), glm::vec3(6.5f, -2.f, length));
+    S = glm::scale(glm::mat4(1.f), glm::vec3(1.f, 1.5f, 1.0f));
     modelMat = T * S;
     modelMatInv = glm::transpose(glm::inverse(modelMat));
 
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
+
+    collectable = glGetUniformLocation(gProgram[2], "collectable");
+
+    if(objects[2])
+        temp = 0.0f;
+    else
+        temp = 1.0f;
+
+    glUniform1f(collectable, temp);
 
     drawModel(2);
 
@@ -670,22 +721,84 @@ void display()
 
     float time = glfwGetTime() * speed * 5.0f; // Assuming you use GLFW for time
     jumpY = 1.5f * sin(time * 2.0f); // Adjust the frequency to control the jump speed
+
     offset += speed / 10;
     offset = offset > 11.0f ? -9.0f : offset;
     speed += 0.001;
 
-    length += 0.5f;
-    length = length > 100.f ? 0.f : length;
+    length += speed / 6;
 
-    if(getHit)
+    if(end)
     {
-        rotate += 1.f * speed;
-        if(rotate > 360.f)
+        
+    }
+    else
+    {
+        if(length > 0.0f) // align with the cube
         {
-            rotate = 0.f;
-            getHit = false;
+            if (xPosition < -5.0f)
+            {
+                if(objects[0])
+                {
+                    getHit = true;
+                    score += 1000;
+                }
+                else
+                {
+                    end = true;
+                }
+                
+            }
+            else if (xPosition > -1.5f && xPosition < 1.5f)
+            {
+                if(objects[1])
+                {
+                    getHit = true;
+                    score += 1000;
+                }
+                else
+                {
+                    end = true;
+                }
+            }
+            else if (xPosition > 5.0f)
+            {
+                if(objects[2])
+                {
+                    getHit = true;
+                    score += 1000;
+                }
+                else
+                {
+                    end = true;
+                }
+            }
+            length = -100.0f;
+            randomize();
+        }
+
+        if(getHit)
+        {
+            rotate += 1.f * speed;
+            if(rotate > 360.f)
+            {
+                rotate = 0.f;
+                getHit = false;
+            }
+        }
+        score += 1 * speed;
+        
+        xPosition += moveSide * 0.075f * speed;
+        if(xPosition > 9.f)
+        {
+            xPosition = 9.f;
+        }
+        else if(xPosition < -9.f)
+        {
+            xPosition = -9.f;
         }
     }
+    
 }
 
 void reshape(GLFWwindow* window, int w, int h)
@@ -704,7 +817,13 @@ void reshape(GLFWwindow* window, int w, int h)
 void restart()
 {
     getHit = false;
+    moveSide = 0;
+    score = 0;
+    speed = 1.0f;
+    xPosition = 0.0f;
 }
+
+
 
 void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -716,31 +835,44 @@ void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
     if (key == GLFW_KEY_R && action == GLFW_PRESS) // RESTART
     {
         restart();
-        getHit = true;
     }
 
-    if (key == GLFW_KEY_A && ((action == GLFW_REPEAT) || (action == GLFW_PRESS))) // LEFT
+    if (key == GLFW_KEY_A && (action == GLFW_PRESS)) // LEFT
     {
-        
-        xPosition -= 0.5f;
-        xPosition = xPosition < -9.5f ? -9.5f : xPosition;
+        if (action == GLFW_PRESS || action == GLFW_REPEAT)
+        {
+            moveSide = -1;
+        }
+        else
+        {
+            moveSide = 0;
+        }
+    }
+    else if (key == GLFW_KEY_D)// RIGHT
+    {
+        if (action == GLFW_PRESS || action == GLFW_REPEAT)
+        {
+            moveSide = 1;
+        }
+        else
+        {
+            moveSide = 0;
+        }
+    }
+    else
+    {
+        moveSide = 0;
     }
 
-    if (key == GLFW_KEY_D && ((action == GLFW_REPEAT) || (action == GLFW_PRESS)))// RIGHT
-    {
-        xPosition += 0.5f;
-        xPosition = xPosition > 9.5f ? 9.5f : xPosition;
-    }
 }
 
 
 void mainLoop(GLFWwindow* window)
 {
-
+    randomize();
     while (!glfwWindowShouldClose(window))
     {
-        glfwWaitEventsTimeout(0.007);
-        //glfwPollEvents();
+        glfwPollEvents();
         display();
         glfwSwapBuffers(window);
 

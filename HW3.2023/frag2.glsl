@@ -13,6 +13,8 @@ vec3 ks = vec3(0.8, 0.8, 0.8);
 varying vec4 fragPos;
 varying vec3 N;
 
+uniform float collectable;
+
 void main(void)
 {
 	vec3 L = normalize(lightPos - vec3(fragPos));
@@ -21,8 +23,22 @@ void main(void)
 	float NdotL = dot(N, L);
 	float NdotH = dot(N, H);
 
+	
+	if(collectable != 0.0)
+	{
+		ka = vec3(1.0, 0.0, 0.0);
+		Iamb = vec3(1.0, 0.0, 0.0);
+		I = vec3(2.0, 0.5, 0.5);
+	}
+	else
+	{
+		ka = vec3(0.1, 0.1, 0.1);
+		I = vec3(2, 2, 2);
+		Iamb = vec3(0.8, 0.8, 0.8);
+	}
+
 	vec3 diffuseColor = I * kd * max(0, NdotL);
-	vec3 ambientColor = Iamb * ka;
+	vec3 ambientColor = Iamb * ka;	
 	vec3 specularColor = I * ks * pow(max(0, NdotH), 20);
 
     gl_FragColor = vec4(diffuseColor + ambientColor + specularColor, 1);
