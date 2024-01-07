@@ -29,7 +29,7 @@ GLint gIntensityLoc;
 float gIntensity = 1000;
 int gWidth = 800, gHeight = 800;
 int score = 0;
-float speed = 1.0f;
+float speed = 2.0f;
 
 bool objects[3];
 
@@ -83,7 +83,7 @@ int faceSize[3];
 
 bool getHit = false;
 int moveSide = 0;
-bool end = false;
+bool endGame = false;
 
 /// Holds all state information relevant to a character as loaded using FreeType
 struct Character {
@@ -431,7 +431,7 @@ void initFonts(int windowWidth, int windowHeight)
 
     // Load font as face
     FT_Face face;
-    if (FT_New_Face(ft, "/usr/share/fonts/liberation/LiberationSerif-Italic.ttf", 0, &face))
+    if (FT_New_Face(ft, "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf", 0, &face))
     {
         std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
     }
@@ -726,11 +726,11 @@ void display()
     offset = offset > 11.0f ? -9.0f : offset;
     speed += 0.001;
 
-    length += speed / 6;
+    length += speed / 3;
 
-    if(end)
+    if(endGame)
     {
-        
+        endGame = false;
     }
     else
     {
@@ -745,7 +745,7 @@ void display()
                 }
                 else
                 {
-                    end = true;
+                    endGame = true;
                 }
                 
             }
@@ -758,7 +758,7 @@ void display()
                 }
                 else
                 {
-                    end = true;
+                    endGame = true;
                 }
             }
             else if (xPosition > 5.0f)
@@ -770,7 +770,7 @@ void display()
                 }
                 else
                 {
-                    end = true;
+                    endGame = true;
                 }
             }
             length = -100.0f;
@@ -779,7 +779,7 @@ void display()
 
         if(getHit)
         {
-            rotate += 1.f * speed;
+            rotate += 3.f * speed;
             if(rotate > 360.f)
             {
                 rotate = 0.f;
@@ -819,7 +819,7 @@ void restart()
     getHit = false;
     moveSide = 0;
     score = 0;
-    speed = 1.0f;
+    speed = 2.0f;
     xPosition = 0.0f;
 }
 
