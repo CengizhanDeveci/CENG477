@@ -9,8 +9,8 @@
 #include <sstream>
 #include <vector>
 #include <random>
-#include <GL/glew.h>   // The GL Header File
-#include <GL/gl.h>   // The GL Header File
+#include <GL/glew.h>    // The GL Header File
+#include <GL/gl.h>      // The GL Header File
 #include <GLFW/glfw3.h> // The GLFW header
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -20,7 +20,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#define BUFFER_OFFSET(i) ((char*)NULL + (i))
+#define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
 using namespace std;
 
@@ -37,35 +37,36 @@ float xPosition = 0.0f;
 
 struct Vertex
 {
-    Vertex(GLfloat inX, GLfloat inY, GLfloat inZ) : x(inX), y(inY), z(inZ) { }
+    Vertex(GLfloat inX, GLfloat inY, GLfloat inZ) : x(inX), y(inY), z(inZ) {}
     GLfloat x, y, z;
 };
 
 struct Texture
 {
-    Texture(GLfloat inU, GLfloat inV) : u(inU), v(inV) { }
+    Texture(GLfloat inU, GLfloat inV) : u(inU), v(inV) {}
     GLfloat u, v;
 };
 
 struct Normal
 {
-    Normal(GLfloat inX, GLfloat inY, GLfloat inZ) : x(inX), y(inY), z(inZ) { }
+    Normal(GLfloat inX, GLfloat inY, GLfloat inZ) : x(inX), y(inY), z(inZ) {}
     GLfloat x, y, z;
 };
 
 struct Face
 {
-	Face(int v[], int t[], int n[]) {
-		vIndex[0] = v[0];
-		vIndex[1] = v[1];
-		vIndex[2] = v[2];
-		tIndex[0] = t[0];
-		tIndex[1] = t[1];
-		tIndex[2] = t[2];
-		nIndex[0] = n[0];
-		nIndex[1] = n[1];
-		nIndex[2] = n[2];
-	}
+    Face(int v[], int t[], int n[])
+    {
+        vIndex[0] = v[0];
+        vIndex[1] = v[1];
+        vIndex[2] = v[2];
+        tIndex[0] = t[0];
+        tIndex[1] = t[1];
+        tIndex[2] = t[2];
+        nIndex[0] = n[0];
+        nIndex[1] = n[1];
+        nIndex[2] = n[2];
+    }
     GLuint vIndex[3], tIndex[3], nIndex[3];
 };
 
@@ -84,33 +85,38 @@ int faceSize[3];
 bool getHit = false;
 int moveSide = 0;
 bool endGame = false;
+double currentTime;
+bool restarted = false;
 
 /// Holds all state information relevant to a character as loaded using FreeType
-struct Character {
+struct Character
+{
     GLuint TextureID;   // ID handle of the glyph texture
     glm::ivec2 Size;    // Size of glyph
-    glm::ivec2 Bearing;  // Offset from baseline to left/top of glyph
-    GLuint Advance;    // Horizontal offset to advance to next glyph
+    glm::ivec2 Bearing; // Offset from baseline to left/top of glyph
+    GLuint Advance;     // Horizontal offset to advance to next glyph
 };
 
 std::map<GLchar, Character> Characters;
 
+void restart();
+
 void randomize()
 {
     int randomNo = rand() % 3;
-    if(randomNo == 0)
+    if (randomNo == 0)
     {
         objects[0] = true;
         objects[1] = false;
         objects[2] = false;
     }
-    else if(randomNo == 1)
+    else if (randomNo == 1)
     {
         objects[0] = false;
         objects[1] = true;
         objects[2] = false;
     }
-    else if(randomNo == 2)
+    else if (randomNo == 2)
     {
         objects[0] = false;
         objects[1] = false;
@@ -118,12 +124,12 @@ void randomize()
     }
 }
 
-bool ParseObj(const string& fileName)
+bool ParseObj(const string &fileName)
 {
     fstream myfile;
     static int i = 1;
 
-    // Open the input 
+    // Open the input
     myfile.open(fileName.c_str(), std::ios::in);
 
     if (myfile.is_open())
@@ -133,7 +139,6 @@ bool ParseObj(const string& fileName)
         gNormalDataByIndex[i] = gNormalDataByIndex[i - 1];
 
         faceSize[i - 1] = 0;
-
 
         while (getline(myfile, curLine))
         {
@@ -174,27 +179,30 @@ bool ParseObj(const string& fileName)
                 else if (curLine[0] == 'f') // face
                 {
                     str >> tmp; // consume "f"
-					char c;
-					int vIndex[3],  nIndex[3], tIndex[3];
-					str >> vIndex[0]; str >> c >> c; // consume "//"
-					str >> nIndex[0]; 
-					str >> vIndex[1]; str >> c >> c; // consume "//"
-					str >> nIndex[1]; 
-					str >> vIndex[2]; str >> c >> c; // consume "//"
-					str >> nIndex[2]; 
+                    char c;
+                    int vIndex[3], nIndex[3], tIndex[3];
+                    str >> vIndex[0];
+                    str >> c >> c; // consume "//"
+                    str >> nIndex[0];
+                    str >> vIndex[1];
+                    str >> c >> c; // consume "//"
+                    str >> nIndex[1];
+                    str >> vIndex[2];
+                    str >> c >> c; // consume "//"
+                    str >> nIndex[2];
 
-					assert(vIndex[0] == nIndex[0] &&
-						   vIndex[1] == nIndex[1] &&
-						   vIndex[2] == nIndex[2]); // a limitation for now
+                    assert(vIndex[0] == nIndex[0] &&
+                           vIndex[1] == nIndex[1] &&
+                           vIndex[2] == nIndex[2]); // a limitation for now
 
-					// make indices start from 0
-					for (int c = 0; c < 3; ++c)
-					{
-						vIndex[c] -= 1;
-						nIndex[c] -= 1;
-						tIndex[c] -= 1;
-					}
-                    
+                    // make indices start from 0
+                    for (int c = 0; c < 3; ++c)
+                    {
+                        vIndex[c] -= 1;
+                        nIndex[c] -= 1;
+                        tIndex[c] -= 1;
+                    }
+
                     faceSize[i - 1]++;
                     gFaces.push_back(Face(vIndex, tIndex, nIndex));
                 }
@@ -204,13 +212,13 @@ bool ParseObj(const string& fileName)
                 }
             }
 
-            //data += curLine;
+            // data += curLine;
             if (!myfile.eof())
             {
-                //data += "\n";
+                // data += "\n";
             }
         }
-        
+
         i++;
 
         myfile.close();
@@ -220,18 +228,18 @@ bool ParseObj(const string& fileName)
         return false;
     }
 
-	assert(gVertices.size() == gNormals.size());
+    assert(gVertices.size() == gNormals.size());
 
     return true;
 }
 
 bool ReadDataFromFile(
-    const string& fileName, ///< [in]  Name of the shader file
-    string&       data)     ///< [out] The contents of the file
+    const string &fileName, ///< [in]  Name of the shader file
+    string &data)           ///< [out] The contents of the file
 {
     fstream myfile;
 
-    // Open the input 
+    // Open the input
     myfile.open(fileName.c_str(), std::ios::in);
 
     if (myfile.is_open())
@@ -257,7 +265,7 @@ bool ReadDataFromFile(
     return true;
 }
 
-void createVS(GLuint& program, const string& filename)
+void createVS(GLuint &program, const string &filename)
 {
     string shaderSource;
 
@@ -268,7 +276,7 @@ void createVS(GLuint& program, const string& filename)
     }
 
     GLint length = shaderSource.length();
-    const GLchar* shader = (const GLchar*) shaderSource.c_str();
+    const GLchar *shader = (const GLchar *)shaderSource.c_str();
 
     GLuint vs = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vs, 1, &shader, &length);
@@ -281,7 +289,7 @@ void createVS(GLuint& program, const string& filename)
     glAttachShader(program, vs);
 }
 
-void createFS(GLuint& program, const string& filename)
+void createFS(GLuint &program, const string &filename)
 {
     string shaderSource;
 
@@ -292,7 +300,7 @@ void createFS(GLuint& program, const string& filename)
     }
 
     GLint length = shaderSource.length();
-    const GLchar* shader = (const GLchar*) shaderSource.c_str();
+    const GLchar *shader = (const GLchar *)shaderSource.c_str();
 
     GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fs, 1, &shader, &length);
@@ -359,9 +367,9 @@ void initVBO()
     gVertexDataSizeInBytes = gVertices.size() * 3 * sizeof(GLfloat);
     gNormalDataSizeInBytes = gNormals.size() * 3 * sizeof(GLfloat);
     int indexDataSizeInBytes = gFaces.size() * 3 * sizeof(GLuint);
-    GLfloat* vertexData = new GLfloat [gVertices.size() * 3];
-    GLfloat* normalData = new GLfloat [gNormals.size() * 3];
-    GLuint* indexData = new GLuint [gFaces.size() * 3];
+    GLfloat *vertexData = new GLfloat[gVertices.size() * 3];
+    GLfloat *normalData = new GLfloat[gNormals.size() * 3];
+    GLuint *indexData = new GLuint[gFaces.size() * 3];
 
     float minX = 1e6, maxX = -1e6;
     float minY = 1e6, maxY = -1e6;
@@ -369,9 +377,9 @@ void initVBO()
 
     for (int i = 0; i < gVertices.size(); ++i)
     {
-        vertexData[3*i] = gVertices[i].x;
-        vertexData[3*i+1] = gVertices[i].y;
-        vertexData[3*i+2] = gVertices[i].z;
+        vertexData[3 * i] = gVertices[i].x;
+        vertexData[3 * i + 1] = gVertices[i].y;
+        vertexData[3 * i + 2] = gVertices[i].z;
 
         minX = std::min(minX, gVertices[i].x);
         maxX = std::max(maxX, gVertices[i].x);
@@ -383,16 +391,16 @@ void initVBO()
 
     for (int i = 0; i < gNormals.size(); ++i)
     {
-        normalData[3*i] = gNormals[i].x;
-        normalData[3*i+1] = gNormals[i].y;
-        normalData[3*i+2] = gNormals[i].z;
+        normalData[3 * i] = gNormals[i].x;
+        normalData[3 * i + 1] = gNormals[i].y;
+        normalData[3 * i + 2] = gNormals[i].z;
     }
 
     for (int i = 0; i < gFaces.size(); ++i)
     {
-        indexData[3*i] = gFaces[i].vIndex[0];
-        indexData[3*i+1] = gFaces[i].vIndex[1];
-        indexData[3*i+2] = gFaces[i].vIndex[2];
+        indexData[3 * i] = gFaces[i].vIndex[0];
+        indexData[3 * i + 1] = gFaces[i].vIndex[1];
+        indexData[3 * i + 2] = gFaces[i].vIndex[2];
     }
 
     glBufferData(GL_ARRAY_BUFFER, gVertexDataSizeInBytes + gNormalDataSizeInBytes, 0, GL_STATIC_DRAW);
@@ -407,13 +415,12 @@ void initVBO()
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes));
-
 }
 
 void initFonts(int windowWidth, int windowHeight)
 {
     // Set OpenGL options
-    //glEnable(GL_CULL_FACE);
+    // glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -431,7 +438,7 @@ void initFonts(int windowWidth, int windowHeight)
 
     // Load font as face
     FT_Face face;
-    if (FT_New_Face(ft, "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf", 0, &face))
+    if (FT_New_Face(ft, "/usr/share/fonts/liberation/LiberationSerif-Italic.ttf", 0, &face))
     {
         std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
     }
@@ -440,12 +447,12 @@ void initFonts(int windowWidth, int windowHeight)
     FT_Set_Pixel_Sizes(face, 0, 48);
 
     // Disable byte-alignment restriction
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1); 
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
     // Load first 128 characters of ASCII set
     for (GLubyte c = 0; c < 128; c++)
     {
-        // Load character glyph 
+        // Load character glyph
         if (FT_Load_Char(face, c, FT_LOAD_RENDER))
         {
             std::cout << "ERROR::FREETYTPE: Failed to load Glyph" << std::endl;
@@ -456,16 +463,15 @@ void initFonts(int windowWidth, int windowHeight)
         glGenTextures(1, &texture);
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexImage2D(
-                GL_TEXTURE_2D,
-                0,
-                GL_RED,
-                face->glyph->bitmap.width,
-                face->glyph->bitmap.rows,
-                0,
-                GL_RED,
-                GL_UNSIGNED_BYTE,
-                face->glyph->bitmap.buffer
-                );
+            GL_TEXTURE_2D,
+            0,
+            GL_RED,
+            face->glyph->bitmap.width,
+            face->glyph->bitmap.rows,
+            0,
+            GL_RED,
+            GL_UNSIGNED_BYTE,
+            face->glyph->bitmap.buffer);
         // Set texture options
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -476,8 +482,7 @@ void initFonts(int windowWidth, int windowHeight)
             texture,
             glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
             glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-            face->glyph->advance.x
-        };
+            face->glyph->advance.x};
         Characters.insert(std::pair<GLchar, Character>(c, character));
     }
 
@@ -499,11 +504,11 @@ void initFonts(int windowWidth, int windowHeight)
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void init() 
+void init()
 {
     gVertexDataByIndex[0] = 0;
     gNormalDataByIndex[0] = 0;
-    
+
     //
 
     ParseObj("quad.obj");
@@ -511,7 +516,6 @@ void init()
     ParseObj("bunny.obj");
 
     ParseObj("cube.obj");
-
 
     glEnable(GL_DEPTH_TEST);
     initShaders();
@@ -521,14 +525,14 @@ void init()
 
 void drawModel(int i = 0)
 {
-	glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, gVertexAttribBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gIndexBuffer);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataByIndex[i]));
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes + gNormalDataByIndex[i]));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataByIndex[i]));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(gVertexDataSizeInBytes + gNormalDataByIndex[i]));
 
-	//glDrawElements(GL_TRIANGLES, faceSize[i] * 3, GL_UNSIGNED_INT, 0);
-    if(i == 2)
+    // glDrawElements(GL_TRIANGLES, faceSize[i] * 3, GL_UNSIGNED_INT, 0);
+    if (i == 2)
     {
         glDrawElements(GL_TRIANGLES, gFaces.size() * 3, GL_UNSIGNED_INT, 0); // i dont know why but it works
     }
@@ -538,17 +542,17 @@ void drawModel(int i = 0)
     }
 }
 
-void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
+void renderText(const std::string &text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
 {
     float static height = y;
-    // Activate corresponding render state	
+    // Activate corresponding render state
     glUseProgram(gProgram[3]);
     glUniform3f(glGetUniformLocation(gProgram[3], "textColor"), color.x, color.y, color.z);
     glActiveTexture(GL_TEXTURE0);
 
     // Iterate through all characters
     std::string::const_iterator c;
-    for (c = text.begin(); c != text.end(); c++) 
+    for (c = text.begin(); c != text.end(); c++)
     {
         Character ch = Characters[*c];
 
@@ -560,14 +564,13 @@ void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, gl
 
         // Update VBO for each character
         GLfloat vertices[6][4] = {
-            { xpos,     ypos + h,   0.0, 0.0 },            
-            { xpos,     ypos,       0.0, 1.0 },
-            { xpos + w, ypos,       1.0, 1.0 },
+            {xpos, ypos + h, 0.0, 0.0},
+            {xpos, ypos, 0.0, 1.0},
+            {xpos + w, ypos, 1.0, 1.0},
 
-            { xpos,     ypos + h,   0.0, 0.0 },
-            { xpos + w, ypos,       1.0, 1.0 },
-            { xpos + w, ypos + h,   1.0, 0.0 }           
-        };
+            {xpos, ypos + h, 0.0, 0.0},
+            {xpos + w, ypos, 1.0, 1.0},
+            {xpos + w, ypos + h, 1.0, 0.0}};
 
         // Render glyph texture over quad
         glBindTexture(GL_TEXTURE_2D, ch.TextureID);
@@ -576,7 +579,7 @@ void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, gl
         glBindBuffer(GL_ARRAY_BUFFER, gTextVBO);
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // Be sure to use glBufferSubData and not glBufferData
 
-        //glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // glBindBuffer(GL_ARRAY_BUFFER, 0);
 
         // Render quad
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -588,7 +591,6 @@ void renderText(const std::string& text, GLfloat x, GLfloat y, GLfloat scale, gl
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-
 void display()
 {
     glClearColor(0, 0, 0, 1);
@@ -596,13 +598,22 @@ void display()
     glClearStencil(0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-	static float jumpY = 0;
+    static float jumpY = 0;
     static float offset = -9.0f;
     static float length = -100.0f;
     static float rotate = 0.0f;
 
-
     // quad
+
+
+    if(restarted)
+    {
+        jumpY = 0;
+        offset = -9.0f;
+        length = -100.0f;
+        rotate = 0.0f;
+        restarted = false;
+    }
 
     glUseProgram(gProgram[1]);
     glLoadIdentity();
@@ -631,7 +642,14 @@ void display()
     glLoadIdentity();
 
     T = glm::translate(glm::mat4(1.f), glm::vec3(xPosition, 0.f - 5.0f + jumpY, -10.f));
-    R = glm::rotate(glm::mat4(1.f), glm::radians(-90.0f + rotate), glm::vec3(0, 1, 0));
+    if (endGame)
+    {
+        R = glm::rotate(glm::mat4(1.f), glm::radians(-90.0f), glm::vec3(0, 0, 1)) * glm::rotate(glm::mat4(1.f), glm::radians(-90.0f), glm::vec3(0, 1, 0));
+    }
+    else
+    {
+        R = glm::rotate(glm::mat4(1.f), glm::radians(-90.0f + rotate), glm::vec3(0, 1, 0));
+    }
     modelMat = T * R;
     modelMatInv = glm::transpose(glm::inverse(modelMat));
     perspMat = glm::perspective(glm::radians(90.0f), 1.f, 0.1f, 200.0f);
@@ -641,8 +659,8 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[0], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
 
     drawModel(1);
-    
-    //cubes
+
+    // cubes
 
     glUseProgram(gProgram[2]);
     glLoadIdentity();
@@ -655,11 +673,11 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMat"), 1, GL_FALSE, glm::value_ptr(modelMat));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "modelingMatInvTr"), 1, GL_FALSE, glm::value_ptr(modelMatInv));
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
-    
+
     GLuint collectable = glGetUniformLocation(gProgram[2], "collectable");
     float temp;
 
-    if(objects[0])
+    if (objects[0])
         temp = 0.0f;
     else
         temp = 1.0f;
@@ -681,7 +699,7 @@ void display()
     glUniformMatrix4fv(glGetUniformLocation(gProgram[2], "perspectiveMat"), 1, GL_FALSE, glm::value_ptr(perspMat));
 
     collectable = glGetUniformLocation(gProgram[2], "collectable");
-    if(objects[1])
+    if (objects[1])
         temp = 0.0f;
     else
         temp = 1.0f;
@@ -704,7 +722,7 @@ void display()
 
     collectable = glGetUniformLocation(gProgram[2], "collectable");
 
-    if(objects[2])
+    if (objects[2])
         temp = 0.0f;
     else
         temp = 1.0f;
@@ -720,7 +738,7 @@ void display()
     assert(glGetError() == GL_NO_ERROR);
 
     float time = glfwGetTime() * speed * 5.0f; // Assuming you use GLFW for time
-    jumpY = 1.5f * sin(time * 2.0f); // Adjust the frequency to control the jump speed
+    jumpY = 1.5f * sin(time * 2.0f);           // Adjust the frequency to control the jump speed
 
     offset += speed / 10;
     offset = offset > 11.0f ? -9.0f : offset;
@@ -728,48 +746,63 @@ void display()
 
     length += speed / 3;
 
-    if(endGame)
+    if (endGame)
     {
-        endGame = false;
+        rotate = 90.0f;
+        moveSide = 0;
+        speed = 0.0;
+        jumpY = 0;
+        double restartTime = glfwGetTime();
+        if (restartTime - currentTime > 2.0f)
+        {
+            jumpY = 0;
+            offset = -9.0f;
+            length = -100.0f;
+            rotate = 0.0f;
+
+            restart();
+        }
     }
     else
     {
-        if(length > 0.0f) // align with the cube
+        if (length > -5.0f) // align with the cube
         {
             if (xPosition < -5.0f)
             {
-                if(objects[0])
+                if (objects[0])
                 {
                     getHit = true;
                     score += 1000;
                 }
                 else
                 {
+                    currentTime = glfwGetTime();
                     endGame = true;
                 }
-                
             }
             else if (xPosition > -1.5f && xPosition < 1.5f)
             {
-                if(objects[1])
+                if (objects[1])
                 {
                     getHit = true;
                     score += 1000;
                 }
                 else
                 {
+                    currentTime = glfwGetTime();
                     endGame = true;
                 }
             }
             else if (xPosition > 5.0f)
             {
-                if(objects[2])
+                if (objects[2])
                 {
                     getHit = true;
                     score += 1000;
                 }
                 else
                 {
+                    currentTime = glfwGetTime();
                     endGame = true;
                 }
             }
@@ -777,31 +810,30 @@ void display()
             randomize();
         }
 
-        if(getHit)
+        if (getHit)
         {
             rotate += 3.f * speed;
-            if(rotate > 360.f)
+            if (rotate > 360.f)
             {
                 rotate = 0.f;
                 getHit = false;
             }
         }
         score += 1 * speed;
-        
+
         xPosition += moveSide * 0.075f * speed;
-        if(xPosition > 9.f)
+        if (xPosition > 9.f)
         {
             xPosition = 9.f;
         }
-        else if(xPosition < -9.f)
+        else if (xPosition < -9.f)
         {
             xPosition = -9.f;
         }
     }
-    
 }
 
-void reshape(GLFWwindow* window, int w, int h)
+void reshape(GLFWwindow *window, int w, int h)
 {
     w = w < 1 ? 1 : w;
     h = h < 1 ? 1 : h;
@@ -812,8 +844,6 @@ void reshape(GLFWwindow* window, int w, int h)
     glViewport(0, 0, w, h);
 }
 
-
-
 void restart()
 {
     getHit = false;
@@ -821,18 +851,19 @@ void restart()
     score = 0;
     speed = 2.0f;
     xPosition = 0.0f;
+    endGame = false;
+    restarted = true;
+    randomize();
 }
 
-
-
-void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
+void keyboard(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
-    
-    if (key == GLFW_KEY_R && action == GLFW_PRESS) // RESTART
+
+    if (key == GLFW_KEY_R && (action == GLFW_PRESS  || action == GLFW_REPEAT)) // RESTART
     {
         restart();
     }
@@ -848,7 +879,7 @@ void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
             moveSide = 0;
         }
     }
-    else if (key == GLFW_KEY_D)// RIGHT
+    else if (key == GLFW_KEY_D) // RIGHT
     {
         if (action == GLFW_PRESS || action == GLFW_REPEAT)
         {
@@ -863,11 +894,9 @@ void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
     {
         moveSide = 0;
     }
-
 }
 
-
-void mainLoop(GLFWwindow* window)
+void mainLoop(GLFWwindow *window)
 {
     randomize();
     while (!glfwWindowShouldClose(window))
@@ -875,13 +904,12 @@ void mainLoop(GLFWwindow* window)
         glfwPollEvents();
         display();
         glfwSwapBuffers(window);
-
     }
 }
 
-int main(int argc, char** argv)   // Create Main Function For Bringing It All Together
+int main(int argc, char **argv) // Create Main Function For Bringing It All Together
 {
-    GLFWwindow* window;
+    GLFWwindow *window;
     if (!glfwInit())
     {
         exit(-1);
@@ -889,8 +917,8 @@ int main(int argc, char** argv)   // Create Main Function For Bringing It All To
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-    //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
-    //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
+    // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
     window = glfwCreateWindow(gWidth, gHeight, "Bunny Run", NULL, NULL);
 
@@ -918,11 +946,10 @@ int main(int argc, char** argv)   // Create Main Function For Bringing It All To
     glfwSetWindowSizeCallback(window, reshape);
 
     reshape(window, gWidth, gHeight); // need to call this once ourselves
-    mainLoop(window); // this does not return unless the window is closed
+    mainLoop(window);                 // this does not return unless the window is closed
 
     glfwDestroyWindow(window);
     glfwTerminate();
 
     return 0;
 }
-
